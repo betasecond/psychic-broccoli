@@ -137,9 +137,9 @@ export const changePasswordAsync = createAsyncThunk(
   }
 )
 
-export const logoutAsync = createAsyncThunk(
+const logoutAsyncThunk = createAsyncThunk(
   'auth/logout',
-  async (_, { dispatch }) => {
+  async () => {
     try {
       // Call logout service to clean up client-side
       authService.logout()
@@ -258,17 +258,17 @@ const authSlice = createSlice({
         state.error = action.payload as string
       })
       // Logout
-      .addCase(logoutAsync.pending, state => {
+      .addCase(logoutAsyncThunk.pending, state => {
         state.loading = true
       })
-      .addCase(logoutAsync.fulfilled, state => {
+      .addCase(logoutAsyncThunk.fulfilled, state => {
         state.user = null
         state.token = null
         state.isAuthenticated = false
         state.loading = false
         state.error = null
       })
-      .addCase(logoutAsync.rejected, state => {
+      .addCase(logoutAsyncThunk.rejected, state => {
         // Even if logout fails, clear the state
         state.user = null
         state.token = null
@@ -280,5 +280,5 @@ const authSlice = createSlice({
 })
 
 export const { logout, clearError, setCredentials } = authSlice.actions
-export { logoutAsync }
+export const logoutAsync = logoutAsyncThunk
 export default authSlice.reducer

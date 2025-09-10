@@ -6,14 +6,13 @@ import {
 } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { LoginPage, RegisterPage } from './pages'
+import { LoginPage, RegisterPage, ProfilePage } from './pages'
 import { ProtectedRoute, AppLayout } from './components'
 import './App.css'
 
 // Placeholder components - will be implemented in later tasks
 const StudentDashboard = () => <div>学生仪表板 - 待实现</div>
 const TeacherDashboard = () => <div>教师仪表板 - 待实现</div>
-const ProfilePage = () => <div>个人资料页面 - 待实现</div>
 
 function App() {
   return (
