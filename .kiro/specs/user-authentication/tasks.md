@@ -29,26 +29,37 @@
   - 实现JwtAuthenticationFilter，拦截请求并验证JWT令牌
   - _需求: 2.4, 3.1, 3.2, 3.3_
 
-- [ ] 2. 用户注册功能实现
+- [x] 2. 用户注册功能实现
+
+
+
+
+
   - 创建注册相关的DTO类和验证逻辑
   - 实现用户注册API端点和业务逻辑
   - 添加用户名重复检查和密码加密功能
   - _需求: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 2.1 创建注册请求和响应DTO
+- [x] 2.1 创建注册请求和响应DTO
+
+
   - 实现RegisterRequest类，包含username、password、confirmPassword、role字段
   - 实现RegisterResponse类，包含userId和username字段
   - 添加Bean Validation注解进行输入验证
   - _需求: 1.1, 1.4, 1.5_
 
-- [ ] 2.2 实现用户注册服务层
+- [x] 2.2 实现用户注册服务层
+
+
   - 创建AuthService类，实现register方法
   - 添加用户名唯一性检查逻辑
   - 使用BCrypt对密码进行加密存储
   - 设置默认角色为STUDENT
   - _需求: 1.2, 1.3, 1.6_
 
-- [ ] 2.3 创建注册API控制器
+- [x] 2.3 创建注册API控制器
+
+
   - 实现AuthController的register端点
   - 添加请求参数验证和异常处理
   - 返回统一的API响应格式
