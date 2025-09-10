@@ -5,6 +5,8 @@ import edu.jimei.backend.dto.LoginResponse;
 import edu.jimei.backend.dto.RegisterRequest;
 import edu.jimei.backend.dto.RegisterResponse;
 import edu.jimei.backend.dto.UserResponse;
+import edu.jimei.backend.dto.UpdateProfileRequest;
+import edu.jimei.backend.dto.ChangePasswordRequest;
 import edu.jimei.backend.entity.User;
 import edu.jimei.backend.entity.UserRole;
 import edu.jimei.backend.exception.UserNotFoundException;
@@ -15,6 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @Transactional
@@ -130,5 +133,64 @@ public class AuthService {
                 .orElseThrow(() -> new UserNotFoundException(userId));
         
         return UserResponse.fromUser(user);
+    }
+    
+    /**
+     * 更新用户个人资料
+     * @param userId 用户ID
+     * @param request 更新请求
+     * @return 更新后的用户信息
+     * @throws UserNotFoundException 当用户不存在时抛出
+     * @throws IllegalArgumentException 当邮箱已被其他用户使用时抛出
+     */
+    public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        
+        // 更新邮箱（如果提供了新邮箱）
+        if (StringUtils.hasText(request.getEmail())) {
+            // 检查邮箱是否已被其他用户使用
+            if (userRepository.existsByEmailAndIdNot(request.getEmail(), userId)) {
+                throw new IllegalArgumentException("邮箱已被其他用户使用");
+            }
+            user.setEmail(request.getEmail());
+        }
+        
+        // 更新头像URL（如果提供了新头像URL）
+        if (StringUtils.hasText(request.getAvatarUrl())) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+        
+        // 保存更新
+        User updatedUser = userRepository.save(user);
+        
+        return UserResponse.fromUser(updatedUser);
+    }
+    
+    /**
+     * 修改用户密码
+     * @param userId 用户ID
+     * @param request 密码修改请求
+     * @throws UserNotFoundException 当用户不存在时抛出
+     * @throws BadCredentialsException 当当前密码错误时抛出
+     * @throws IllegalArgumentException 当新密码不匹配时抛出
+     */
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        // 验证新密码是否匹配
+        if (!request.isNewPasswordMatching()) {
+            throw new IllegalArgumentException("两次新密码输入不一致");
+        }
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        
+        // 验证当前密码
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BadCredentialsException("当前密码错误");
+        }
+        
+        // 更新密码
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }

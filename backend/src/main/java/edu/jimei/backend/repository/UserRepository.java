@@ -28,4 +28,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 检查邮箱是否存在
      */
     boolean existsByEmail(String email);
+    
+    /**
+     * 检查邮箱是否被其他用户使用（排除指定用户ID）
+     */
+    boolean existsByEmailAndIdNot(String email, Long id);
 }
