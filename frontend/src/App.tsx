@@ -7,6 +7,7 @@ import {
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { LoginPage, RegisterPage } from './pages'
+import { ProtectedRoute, AppLayout } from './components'
 import './App.css'
 
 // Placeholder components - will be implemented in later tasks
@@ -24,10 +25,37 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            {/* Protected routes - will add protection in later tasks */}
-            <Route path="/student/dashboard" element={<StudentDashboard />} />
-            <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            {/* Protected routes */}
+            <Route
+              path="/student/dashboard"
+              element={
+                <ProtectedRoute requiredRole="STUDENT">
+                  <AppLayout>
+                    <StudentDashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/dashboard"
+              element={
+                <ProtectedRoute requiredRole="INSTRUCTOR">
+                  <AppLayout>
+                    <TeacherDashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ProfilePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/login" replace />} />

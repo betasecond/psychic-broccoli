@@ -4,6 +4,7 @@ import {
   type PayloadAction,
 } from '@reduxjs/toolkit'
 import { authService } from '../../services/authService'
+import { sessionManager } from '../../utils/sessionManager'
 
 // Types
 export interface User {
@@ -40,7 +41,8 @@ export const loginAsync = createAsyncThunk(
   ) => {
     try {
       const response = await authService.login(credentials)
-      localStorage.setItem('token', response.accessToken)
+      // Save session using session manager
+      sessionManager.saveSession(response.accessToken, response.user)
       return response
     } catch (error) {
       const errorMessage =
@@ -135,6 +137,23 @@ export const changePasswordAsync = createAsyncThunk(
   }
 )
 
+export const logoutAsync = createAsyncThunk(
+  'auth/logout',
+  async (_, { dispatch }) => {
+    try {
+      // Call logout service to clean up client-side
+      authService.logout()
+      // Clear session using session manager
+      sessionManager.clearSession()
+      return true
+    } catch (error) {
+      // Even if logout fails, we should clear local state
+      sessionManager.clearSession()
+      return true
+    }
+  }
+)
+
 // Auth slice
 const authSlice = createSlice({
   name: 'auth',
@@ -145,7 +164,8 @@ const authSlice = createSlice({
       state.token = null
       state.isAuthenticated = false
       state.error = null
-      localStorage.removeItem('token')
+      // Clear session using session manager
+      sessionManager.clearSession()
     },
     clearError: state => {
       state.error = null
@@ -207,7 +227,8 @@ const authSlice = createSlice({
         state.token = null
         state.isAuthenticated = false
         state.error = action.payload as string
-        localStorage.removeItem('token')
+        // Clear session using session manager
+        sessionManager.clearSession()
       })
       // Update profile
       .addCase(updateProfileAsync.pending, state => {
@@ -236,8 +257,28 @@ const authSlice = createSlice({
         state.loading = false
         state.error = action.payload as string
       })
+      // Logout
+      .addCase(logoutAsync.pending, state => {
+        state.loading = true
+      })
+      .addCase(logoutAsync.fulfilled, state => {
+        state.user = null
+        state.token = null
+        state.isAuthenticated = false
+        state.loading = false
+        state.error = null
+      })
+      .addCase(logoutAsync.rejected, state => {
+        // Even if logout fails, clear the state
+        state.user = null
+        state.token = null
+        state.isAuthenticated = false
+        state.loading = false
+        state.error = null
+      })
   },
 })
 
 export const { logout, clearError, setCredentials } = authSlice.actions
+export { logoutAsync }
 export default authSlice.reducer
