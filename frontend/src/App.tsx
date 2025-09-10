@@ -7,12 +7,13 @@ import {
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { LoginPage, RegisterPage, ProfilePage } from './pages'
-import { ProtectedRoute, AppLayout } from './components'
+import { ProtectedRoute, AppLayout, RoleBasedWelcome } from './components'
 import './App.css'
 
-// Placeholder components - will be implemented in later tasks
-const StudentDashboard = () => <div>学生仪表板 - 待实现</div>
-const TeacherDashboard = () => <div>教师仪表板 - 待实现</div>
+// Dashboard components using RoleBasedWelcome
+const StudentDashboard = () => <RoleBasedWelcome />
+const TeacherDashboard = () => <RoleBasedWelcome />
+const AdminDashboard = () => <RoleBasedWelcome />
 
 function App() {
   return (
@@ -41,6 +42,16 @@ function App() {
                 <ProtectedRoute requiredRole="INSTRUCTOR">
                   <AppLayout>
                     <TeacherDashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <AppLayout>
+                    <AdminDashboard />
                   </AppLayout>
                 </ProtectedRoute>
               }

@@ -1,30 +1,56 @@
-import React from 'react'
-import { Layout } from 'antd'
-import { UserMenu } from './index'
+import React, { useState } from 'react'
+import { Layout, Button } from 'antd'
+import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { UserAvatar, RoleBasedNavigation } from './index'
 import './AppLayout.css'
 
-const { Header, Content } = Layout
+const { Header, Content, Sider } = Layout
 
 interface AppLayoutProps {
   children: React.ReactNode
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const [collapsed, setCollapsed] = useState(false)
+
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed)
+  }
+
   return (
     <Layout className="app-layout">
-      <Header className="app-header">
-        <div className="app-header-content">
-          <div className="app-logo">
-            <h2>在线教育平台</h2>
-          </div>
-          <div className="app-header-actions">
-            <UserMenu />
-          </div>
+      <Sider
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
+        width={240}
+        className="app-sider"
+      >
+        <div className="app-sider-logo">
+          <h3>{collapsed ? '教育' : '在线教育平台'}</h3>
         </div>
-      </Header>
-      <Content className="app-content">
-        {children}
-      </Content>
+        <RoleBasedNavigation />
+      </Sider>
+      <Layout>
+        <Header className="app-header">
+          <div className="app-header-content">
+            <div className="app-header-left">
+              <Button
+                type="text"
+                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={toggleSidebar}
+                className="sidebar-toggle"
+              />
+            </div>
+            <div className="app-header-actions">
+              <UserAvatar />
+            </div>
+          </div>
+        </Header>
+        <Content className="app-content">
+          {children}
+        </Content>
+      </Layout>
     </Layout>
   )
 }
