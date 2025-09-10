@@ -2,19 +2,28 @@
 
 ## 实现任务
 
-- [ ] 1. 后端基础架构搭建
+- [x] 1. 后端基础架构搭建
+
+
+
+
+
   - 配置Spring Boot项目基础依赖和安全框架
   - 创建用户实体类和数据库表结构
   - 配置JWT工具类和安全配置
   - _需求: 1.1, 2.1, 3.1_
 
-- [ ] 1.1 创建用户实体和数据库配置
+- [x] 1.1 创建用户实体和数据库配置
+
+
   - 实现User实体类，包含id、username、passwordHash、email、avatarUrl、role等字段
   - 配置PostgreSQL数据源和JPA设置
   - 创建数据库迁移脚本，建立users表和相关索引
   - _需求: 1.2, 2.2, 4.2_
 
-- [ ] 1.2 实现JWT工具类和安全配置
+- [x] 1.2 实现JWT工具类和安全配置
+
+
   - 创建JwtUtils工具类，实现JWT令牌的生成、验证和解析
   - 配置Spring Security，设置JWT过滤器和认证入口点
   - 实现JwtAuthenticationFilter，拦截请求并验证JWT令牌
