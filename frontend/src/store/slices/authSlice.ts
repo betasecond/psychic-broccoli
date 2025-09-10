@@ -1,5 +1,9 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
-import { authService } from '@/services/authService'
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from '@reduxjs/toolkit'
+import { authService } from '../../services/authService'
 
 // Types
 export interface User {
@@ -39,9 +43,11 @@ export const loginAsync = createAsyncThunk(
       localStorage.setItem('token', response.accessToken)
       return response
     } catch (error) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '登录失败，请重试'
-        : '登录失败，请重试'
+      const errorMessage =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '登录失败，请重试'
+          : '登录失败，请重试'
       return rejectWithValue(errorMessage)
     }
   }
@@ -62,9 +68,11 @@ export const registerAsync = createAsyncThunk(
       const response = await authService.register(userData)
       return response
     } catch (error) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '注册失败，请重试'
-        : '注册失败，请重试'
+      const errorMessage =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '注册失败，请重试'
+          : '注册失败，请重试'
       return rejectWithValue(errorMessage)
     }
   }
@@ -77,9 +85,11 @@ export const getCurrentUserAsync = createAsyncThunk(
       const response = await authService.getCurrentUser()
       return response
     } catch (error) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '获取用户信息失败'
-        : '获取用户信息失败'
+      const errorMessage =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '获取用户信息失败'
+          : '获取用户信息失败'
       return rejectWithValue(errorMessage)
     }
   }
@@ -95,9 +105,11 @@ export const updateProfileAsync = createAsyncThunk(
       const response = await authService.updateProfile(profileData)
       return response
     } catch (error) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '更新个人信息失败'
-        : '更新个人信息失败'
+      const errorMessage =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '更新个人信息失败'
+          : '更新个人信息失败'
       return rejectWithValue(errorMessage)
     }
   }
@@ -113,9 +125,11 @@ export const changePasswordAsync = createAsyncThunk(
       await authService.changePassword(passwordData)
       return '密码修改成功'
     } catch (error) {
-      const errorMessage = error instanceof Error && 'response' in error 
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '密码修改失败'
-        : '密码修改失败'
+      const errorMessage =
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '密码修改失败'
+          : '密码修改失败'
       return rejectWithValue(errorMessage)
     }
   }

@@ -15,7 +15,7 @@ const api: AxiosInstance = axios.create({
 
 // Request interceptor - Add JWT token to requests
 api.interceptors.request.use(
-  (config) => {
+  config => {
     const token = localStorage.getItem('token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
@@ -58,9 +58,10 @@ api.interceptors.response.use(
           // Validation error
           if (data.errors && Array.isArray(data.errors)) {
             data.errors.forEach((err: unknown) => {
-              const errorMessage = typeof err === 'object' && err !== null && 'message' in err 
-                ? (err as { message: string }).message 
-                : String(err)
+              const errorMessage =
+                typeof err === 'object' && err !== null && 'message' in err
+                  ? (err as { message: string }).message
+                  : String(err)
               message.error(errorMessage)
             })
           } else {

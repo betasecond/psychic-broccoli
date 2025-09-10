@@ -86,7 +86,9 @@ class AuthService {
   /**
    * Update user profile
    */
-  async updateProfile(profileData: UpdateProfileRequest): Promise<UserResponse> {
+  async updateProfile(
+    profileData: UpdateProfileRequest
+  ): Promise<UserResponse> {
     const response = await api.put('/auth/profile', profileData)
     return response.data
   }
