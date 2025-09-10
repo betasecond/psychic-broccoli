@@ -2,8 +2,10 @@ package edu.jimei.backend.service;
 
 import edu.jimei.backend.dto.RegisterRequest;
 import edu.jimei.backend.dto.RegisterResponse;
+import edu.jimei.backend.dto.UserResponse;
 import edu.jimei.backend.entity.User;
 import edu.jimei.backend.entity.UserRole;
+import edu.jimei.backend.exception.UserNotFoundException;
 import edu.jimei.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -145,5 +149,48 @@ class AuthServiceTest {
         // Assert
         assertFalse(result);
         verify(userRepository).existsByUsername("existinguser");
+    }
+    
+    @Test
+    void getCurrentUser_WithValidUserId_ShouldReturnUserResponse() {
+        // Arrange
+        Long userId = 1L;
+        User user = new User();
+        user.setId(userId);
+        user.setUsername("testuser");
+        user.setEmail("test@example.com");
+        user.setRole(UserRole.STUDENT);
+        user.setAvatarUrl("http://example.com/avatar.jpg");
+        
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        
+        // Act
+        UserResponse response = authService.getCurrentUser(userId);
+        
+        // Assert
+        assertNotNull(response);
+        assertEquals(userId, response.getUserId());
+        assertEquals("testuser", response.getUsername());
+        assertEquals("test@example.com", response.getEmail());
+        assertEquals(UserRole.STUDENT, response.getRole());
+        assertEquals("http://example.com/avatar.jpg", response.getAvatarUrl());
+        
+        verify(userRepository).findById(userId);
+    }
+    
+    @Test
+    void getCurrentUser_WithInvalidUserId_ShouldThrowUserNotFoundException() {
+        // Arrange
+        Long userId = 999L;
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        
+        // Act & Assert
+        UserNotFoundException exception = assertThrows(
+                UserNotFoundException.class,
+                () -> authService.getCurrentUser(userId)
+        );
+        
+        assertEquals("用户不存在，用户ID: " + userId, exception.getMessage());
+        verify(userRepository).findById(userId);
     }
 }

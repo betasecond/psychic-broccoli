@@ -5,9 +5,12 @@ import edu.jimei.backend.dto.LoginRequest;
 import edu.jimei.backend.dto.LoginResponse;
 import edu.jimei.backend.dto.RegisterRequest;
 import edu.jimei.backend.dto.RegisterResponse;
+import edu.jimei.backend.dto.UserResponse;
 import edu.jimei.backend.entity.UserRole;
+import edu.jimei.backend.security.UserPrincipal;
 import edu.jimei.backend.service.AuthService;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -180,6 +183,40 @@ public class AuthController {
             logger.error("检查邮箱可用性时发生错误", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error(500, "服务器内部错误"));
+        }
+    }
+    
+    /**
+     * 获取当前登录用户信息
+     * @param authentication Spring Security认证对象
+     * @return 当前用户信息，不包含敏感数据
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(Authentication authentication) {
+        logger.info("收到获取当前用户信息请求");
+        
+        try {
+            // 从认证对象中获取用户主体信息
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            Long userId = userPrincipal.getUserId();
+            
+            logger.debug("正在获取用户信息，用户ID: {}", userId);
+            
+            // 调用服务层获取用户信息
+            UserResponse userResponse = authService.getCurrentUser(userId);
+            
+            logger.info("成功获取用户信息: {}", userResponse.getUsername());
+            return ResponseEntity.ok(ApiResponse.success("获取用户信息成功", userResponse));
+            
+        } catch (ClassCastException e) {
+            logger.error("认证对象类型转换失败", e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(401, "认证信息无效"));
+            
+        } catch (Exception e) {
+            logger.error("获取当前用户信息时发生错误", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(500, "服务器内部错误，请稍后重试"));
         }
     }
 }

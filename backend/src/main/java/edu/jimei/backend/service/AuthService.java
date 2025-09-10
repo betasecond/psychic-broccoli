@@ -7,6 +7,7 @@ import edu.jimei.backend.dto.RegisterResponse;
 import edu.jimei.backend.dto.UserResponse;
 import edu.jimei.backend.entity.User;
 import edu.jimei.backend.entity.UserRole;
+import edu.jimei.backend.exception.UserNotFoundException;
 import edu.jimei.backend.repository.UserRepository;
 import edu.jimei.backend.util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,5 +117,18 @@ public class AuthService {
             return true;
         }
         return !userRepository.existsByEmail(email);
+    }
+    
+    /**
+     * 根据用户ID获取当前用户信息
+     * @param userId 用户ID
+     * @return 用户响应对象，不包含敏感信息
+     * @throws UserNotFoundException 当用户不存在时抛出
+     */
+    public UserResponse getCurrentUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        
+        return UserResponse.fromUser(user);
     }
 }

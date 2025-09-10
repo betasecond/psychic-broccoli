@@ -65,6 +65,18 @@ public class GlobalExceptionHandler {
     }
     
     /**
+     * 处理用户未找到异常
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserNotFoundException(
+            UserNotFoundException ex, WebRequest request) {
+        
+        logger.warn("用户未找到: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(404, ex.getMessage()));
+    }
+    
+    /**
      * 处理非法参数异常
      */
     @ExceptionHandler(IllegalArgumentException.class)
