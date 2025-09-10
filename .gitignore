@@ -1,0 +1,26 @@
+# IDEs and OS-specific
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/build/
+
+# Backend (Java/Maven/Gradle)
+backend/target/
+backend/build/
+backend/.gradle/
+backend/out/
+*.jar
+*.war
