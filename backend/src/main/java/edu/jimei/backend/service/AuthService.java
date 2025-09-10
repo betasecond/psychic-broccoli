@@ -1,11 +1,16 @@
 package edu.jimei.backend.service;
 
+import edu.jimei.backend.dto.LoginRequest;
+import edu.jimei.backend.dto.LoginResponse;
 import edu.jimei.backend.dto.RegisterRequest;
 import edu.jimei.backend.dto.RegisterResponse;
+import edu.jimei.backend.dto.UserResponse;
 import edu.jimei.backend.entity.User;
 import edu.jimei.backend.entity.UserRole;
 import edu.jimei.backend.repository.UserRepository;
+import edu.jimei.backend.util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +21,13 @@ public class AuthService {
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
     
     @Autowired
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtils jwtUtils) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtils = jwtUtils;
     }
     
     /**
@@ -62,6 +69,32 @@ public class AuthService {
         
         // 返回注册响应
         return new RegisterResponse(savedUser.getId(), savedUser.getUsername());
+    }
+    
+    /**
+     * 用户登录
+     * @param request 登录请求
+     * @return 登录响应，包含JWT令牌和用户信息
+     * @throws BadCredentialsException 当用户名或密码错误时抛出
+     */
+    public LoginResponse login(LoginRequest request) {
+        // 根据用户名查找用户
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new BadCredentialsException("用户名或密码错误"));
+        
+        // 验证密码
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new BadCredentialsException("用户名或密码错误");
+        }
+        
+        // 生成JWT令牌
+        String accessToken = jwtUtils.generateJwtToken(user);
+        
+        // 创建用户响应对象
+        UserResponse userResponse = UserResponse.fromUser(user);
+        
+        // 返回登录响应
+        return LoginResponse.create(accessToken, userResponse);
     }
     
     /**
