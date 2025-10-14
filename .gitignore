@@ -13,16 +13,45 @@ Thumbs.db
 !.env.example
 *.log
 
-# Frontend (React/Vite)
+# Build and distribution directories
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/build/
-
-# Backend (Java/Maven/Gradle)
 backend/target/
 backend/build/
 backend/.gradle/
 backend/out/
 *.jar
 *.war
+
+# Archives and backup files
+*.tar
+*.tar.gz
+*.tar.bz2
+*.zip
+*.rar
+*.7z
+
+# Docker
+docker-compose*.yml
+*.dockerfile
+Dockerfile
+backend/Dockerfile
+frontend/Dockerfile
+nginx.conf
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+
+# Editor temporary files
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+ehthumbs.db
