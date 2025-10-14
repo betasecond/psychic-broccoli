@@ -7,8 +7,40 @@ import {
 } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { LoginPage, RegisterPage, ProfilePage } from './pages'
-import { ProtectedRoute, AppLayout, RoleBasedWelcome } from './components'
+import { 
+  LoginPage, 
+  RegisterPage, 
+  ProfilePage,
+  // Student pages
+  AssignmentsPage,
+  CoursesPage,
+  ExamsPage,
+  LiveClassesPage,
+  SchedulePage,
+  MessagesPage,
+  // Teacher pages
+  TeacherCoursesPage,
+  StudentsPage,
+  TeacherAssignmentsPage,
+  TeacherExamsPage,
+  TeacherLiveClassesPage,
+  AnalyticsPage,
+  // Teacher sub-pages
+  CreateCoursePage,
+  CourseMaterialsPage,
+  AssignmentsListPage,
+  CreateAssignmentPage,
+  GradingPage,
+  ExamsListPage,
+  CreateExamPage,
+  ExamResultsPage,
+  // Admin pages
+  UsersPage,
+  AdminCoursesPage,
+  SystemPage,
+  AdminAnalyticsPage,
+} from './pages'
+import { AppLayout, RoleBasedWelcome } from './components'
 import ErrorBoundary from './components/ErrorBoundary'
 import { PerformanceMonitor } from './utils/performance'
 import { ErrorHandler } from './utils/errorHandler'
@@ -54,51 +86,293 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
 
-              {/* Protected routes */}
+              {/* Public routes - no authentication required */}
               <Route
                 path="/student/dashboard"
                 element={
-                  <ProtectedRoute requiredRole="STUDENT">
-                    <AppLayout>
-                      <StudentDashboard />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <AppLayout>
+                    <StudentDashboard />
+                  </AppLayout>
                 }
               />
+              <Route
+                path="/student/courses"
+                element={
+                  <AppLayout>
+                    <CoursesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/assignments"
+                element={
+                  <AppLayout>
+                    <AssignmentsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/exams"
+                element={
+                  <AppLayout>
+                    <ExamsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/live-classes"
+                element={
+                  <AppLayout>
+                    <LiveClassesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/schedule"
+                element={
+                  <AppLayout>
+                    <SchedulePage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/messages"
+                element={
+                  <AppLayout>
+                    <MessagesPage />
+                  </AppLayout>
+                }
+              />
+              {/* Teacher routes */}
               <Route
                 path="/teacher/dashboard"
                 element={
-                  <ProtectedRoute requiredRole="INSTRUCTOR">
-                    <AppLayout>
-                      <TeacherDashboard />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <AppLayout>
+                    <TeacherDashboard />
+                  </AppLayout>
                 }
               />
               <Route
+                path="/teacher/courses"
+                element={
+                  <AppLayout>
+                    <TeacherCoursesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/courses/list"
+                element={
+                  <AppLayout>
+                    <TeacherCoursesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/courses/create"
+                element={
+                  <AppLayout>
+                    <CreateCoursePage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/courses/materials"
+                element={
+                  <AppLayout>
+                    <CourseMaterialsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/students"
+                element={
+                  <AppLayout>
+                    <StudentsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/assignments"
+                element={
+                  <AppLayout>
+                    <TeacherAssignmentsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/assignments/list"
+                element={
+                  <AppLayout>
+                    <AssignmentsListPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/assignments/create"
+                element={
+                  <AppLayout>
+                    <CreateAssignmentPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/assignments/grading"
+                element={
+                  <AppLayout>
+                    <GradingPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/exams"
+                element={
+                  <AppLayout>
+                    <TeacherExamsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/exams/list"
+                element={
+                  <AppLayout>
+                    <ExamsListPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/exams/create"
+                element={
+                  <AppLayout>
+                    <CreateExamPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/exams/results"
+                element={
+                  <AppLayout>
+                    <ExamResultsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/live-classes"
+                element={
+                  <AppLayout>
+                    <TeacherLiveClassesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/teacher/analytics"
+                element={
+                  <AppLayout>
+                    <AnalyticsPage />
+                  </AppLayout>
+                }
+              />
+              {/* Admin routes */}
+              <Route
                 path="/admin/dashboard"
                 element={
-                  <ProtectedRoute requiredRole="ADMIN">
-                    <AppLayout>
-                      <AdminDashboard />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <AppLayout>
+                    <AdminDashboard />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <AppLayout>
+                    <UsersPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/users/students"
+                element={
+                  <AppLayout>
+                    <UsersPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/users/instructors"
+                element={
+                  <AppLayout>
+                    <UsersPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/users/admins"
+                element={
+                  <AppLayout>
+                    <UsersPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/courses"
+                element={
+                  <AppLayout>
+                    <AdminCoursesPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/system"
+                element={
+                  <AppLayout>
+                    <SystemPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/system/config"
+                element={
+                  <AppLayout>
+                    <SystemPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/system/logs"
+                element={
+                  <AppLayout>
+                    <SystemPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/system/backup"
+                element={
+                  <AppLayout>
+                    <SystemPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <AppLayout>
+                    <AdminAnalyticsPage />
+                  </AppLayout>
                 }
               />
               <Route
                 path="/profile"
                 element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <ProfilePage />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <AppLayout>
+                    <ProfilePage />
+                  </AppLayout>
                 }
               />
 
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="*" element={<Navigate to="/login" replace />} />
+              {/* Default redirect to student dashboard */}
+              <Route path="/" element={<Navigate to="/student/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
             </Routes>
           </div>
         </Router>

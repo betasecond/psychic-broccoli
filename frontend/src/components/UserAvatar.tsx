@@ -2,29 +2,32 @@ import React from 'react'
 import { Dropdown, Avatar, Button, Space, Badge, type MenuProps } from 'antd'
 import {
   UserOutlined,
-  LogoutOutlined,
   SettingOutlined,
   CrownOutlined,
   BookOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAppSelector, useAppDispatch } from '../store'
-import { logoutAsync } from '../store/slices/authSlice'
+import { useAppSelector } from '../store'
 
 const UserAvatar: React.FC = () => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
-  const { user, loading } = useAppSelector(state => state.auth)
-
-  const handleLogout = async () => {
-    await dispatch(logoutAsync())
-    navigate('/login')
-  }
+  const { user } = useAppSelector(state => state.auth)
 
   const handleProfile = () => {
     navigate('/profile')
   }
+
+  // Default user when no authentication
+  const defaultUser = {
+    username: '访客',
+    email: 'guest@example.com',
+    avatarUrl: '',
+    role: 'STUDENT'
+  }
+
+  // Use provided user if available, otherwise use default
+  const displayUser = user || defaultUser
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -71,15 +74,15 @@ const UserAvatar: React.FC = () => {
       label: (
         <div style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-            {user?.username}
+            {displayUser.username}
           </div>
           <div style={{ fontSize: '12px', color: '#666' }}>
-            {user?.email || '未设置邮箱'}
+            {displayUser.email}
           </div>
           <div style={{ marginTop: '4px' }}>
             <Badge
-              color={getRoleBadgeColor(user?.role || '')}
-              text={getRoleText(user?.role || '')}
+              color={getRoleBadgeColor(displayUser.role)}
+              text={getRoleText(displayUser.role)}
             />
           </div>
         </div>
@@ -95,20 +98,7 @@ const UserAvatar: React.FC = () => {
       icon: <SettingOutlined />,
       onClick: handleProfile,
     },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'logout',
-      label: '退出登录',
-      icon: <LogoutOutlined />,
-      onClick: handleLogout,
-    },
   ]
-
-  if (!user) {
-    return null
-  }
 
   return (
     <Dropdown
@@ -120,7 +110,6 @@ const UserAvatar: React.FC = () => {
       <Button
         type="text"
         className="user-avatar-button"
-        loading={loading}
         style={{
           height: 'auto',
           padding: '8px 12px',
@@ -133,24 +122,24 @@ const UserAvatar: React.FC = () => {
         <Space align="center">
           <Badge
             dot
-            color={getRoleBadgeColor(user.role)}
+            color={getRoleBadgeColor(displayUser.role)}
             offset={[-2, 2]}
           >
             <Avatar
               size={32}
-              src={user.avatarUrl}
-              icon={!user.avatarUrl && getRoleIcon(user.role)}
+              src={displayUser.avatarUrl}
+              icon={!displayUser.avatarUrl && getRoleIcon(displayUser.role)}
               style={{
-                backgroundColor: !user.avatarUrl ? getRoleBadgeColor(user.role) : undefined,
+                backgroundColor: !displayUser.avatarUrl ? getRoleBadgeColor(displayUser.role) : undefined,
               }}
             />
           </Badge>
           <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
             <div style={{ fontWeight: 500, fontSize: '14px' }}>
-              {user.username}
+              {displayUser.username}
             </div>
             <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-              {getRoleText(user.role)}
+              {getRoleText(displayUser.role)}
             </div>
           </div>
         </Space>

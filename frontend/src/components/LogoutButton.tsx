@@ -1,9 +1,7 @@
 import React from 'react'
-import { Button, Modal } from 'antd'
+import { Button, message } from 'antd'
 import { LogoutOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAppDispatch } from '../store'
-import { logoutAsync } from '../store/slices/authSlice'
 
 interface LogoutButtonProps {
   type?: 'primary' | 'default' | 'dashed' | 'link' | 'text'
@@ -19,27 +17,15 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({
   children,
 }) => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
 
   const handleLogout = () => {
     if (showConfirm) {
-      Modal.confirm({
-        title: '确认退出',
-        content: '您确定要退出登录吗？',
-        okText: '确定',
-        cancelText: '取消',
-        onOk: () => {
-          performLogout()
-        },
-      })
+      // Show a message instead of logout functionality
+      message.info('当前为无认证模式，无需退出登录')
     } else {
-      performLogout()
+      // Redirect to dashboard instead of login
+      navigate('/student/dashboard')
     }
-  }
-
-  const performLogout = async () => {
-    await dispatch(logoutAsync())
-    navigate('/login')
   }
 
   return (
@@ -49,7 +35,7 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({
       icon={<LogoutOutlined />}
       onClick={handleLogout}
     >
-      {children || '退出登录'}
+      {children || '登出'}
     </Button>
   )
 }

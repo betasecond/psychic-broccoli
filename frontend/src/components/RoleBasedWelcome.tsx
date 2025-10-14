@@ -11,7 +11,6 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAppSelector } from '../store'
 
 const { Title, Paragraph } = Typography
 
@@ -48,13 +47,18 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, pat
 }
 
 const RoleBasedWelcome: React.FC = () => {
-  const { user } = useAppSelector(state => state.auth)
+  const navigate = useNavigate()
 
-  if (!user) {
-    return null
+  // Default welcome message
+  const welcomeMessage = {
+    title: '欢迎来到在线教育平台！',
+    subtitle: '开始您的学习之旅',
+    description: '在这里您可以访问学生、教师和管理员功能，体验完整的教育平台功能。',
   }
 
-  const getStudentFeatures = () => [
+  // All available features for all roles
+  const getAllFeatures = () => [
+    // Student features
     {
       icon: <BookOutlined />,
       title: '我的课程',
@@ -83,23 +87,7 @@ const RoleBasedWelcome: React.FC = () => {
       path: '/student/live-classes',
       color: '#eb2f96',
     },
-    {
-      icon: <CalendarOutlined />,
-      title: '课程表',
-      description: '查看个人学习时间安排',
-      path: '/student/schedule',
-      color: '#722ed1',
-    },
-    {
-      icon: <BarChartOutlined />,
-      title: '学习统计',
-      description: '查看学习数据和进度分析',
-      path: '/student/analytics',
-      color: '#13c2c2',
-    },
-  ]
-
-  const getInstructorFeatures = () => [
+    // Teacher features
     {
       icon: <BookOutlined />,
       title: '课程管理',
@@ -114,37 +102,7 @@ const RoleBasedWelcome: React.FC = () => {
       path: '/teacher/students',
       color: '#52c41a',
     },
-    {
-      icon: <FileTextOutlined />,
-      title: '作业管理',
-      description: '布置作业，批改和评分',
-      path: '/teacher/assignments',
-      color: '#fa8c16',
-    },
-    {
-      icon: <BarChartOutlined />,
-      title: '考试管理',
-      description: '创建考试，查看考试结果',
-      path: '/teacher/exams',
-      color: '#eb2f96',
-    },
-    {
-      icon: <VideoCameraOutlined />,
-      title: '直播教学',
-      description: '开展在线直播课程',
-      path: '/teacher/live-classes',
-      color: '#722ed1',
-    },
-    {
-      icon: <BarChartOutlined />,
-      title: '教学分析',
-      description: '查看教学效果和数据分析',
-      path: '/teacher/analytics',
-      color: '#13c2c2',
-    },
-  ]
-
-  const getAdminFeatures = () => [
+    // Admin features
     {
       icon: <UserOutlined />,
       title: '用户管理',
@@ -153,18 +111,33 @@ const RoleBasedWelcome: React.FC = () => {
       color: '#1890ff',
     },
     {
-      icon: <BookOutlined />,
-      title: '课程管理',
-      description: '监督和管理平台所有课程',
-      path: '/admin/courses',
-      color: '#52c41a',
-    },
-    {
       icon: <SettingOutlined />,
       title: '系统设置',
       description: '配置系统参数和功能',
       path: '/admin/system',
       color: '#fa8c16',
+    },
+    // Additional features
+    {
+      icon: <CalendarOutlined />,
+      title: '课程表',
+      description: '查看个人学习时间安排',
+      path: '/student/schedule',
+      color: '#722ed1',
+    },
+    {
+      icon: <BarChartOutlined />,
+      title: '学习统计',
+      description: '查看学习数据和进度分析',
+      path: '/student/analytics',
+      color: '#13c2c2',
+    },
+    {
+      icon: <BarChartOutlined />,
+      title: '教学分析',
+      description: '查看教学效果和数据分析',
+      path: '/teacher/analytics',
+      color: '#13c2c2',
     },
     {
       icon: <BarChartOutlined />,
@@ -175,50 +148,7 @@ const RoleBasedWelcome: React.FC = () => {
     },
   ]
 
-  const getWelcomeMessage = () => {
-    switch (user.role) {
-      case 'STUDENT':
-        return {
-          title: `欢迎回来，${user.username}！`,
-          subtitle: '开始您的学习之旅',
-          description: '在这里您可以访问所有的学习资源，完成作业，参加考试，与老师和同学互动。',
-        }
-      case 'INSTRUCTOR':
-        return {
-          title: `欢迎回来，${user.username} 老师！`,
-          subtitle: '管理您的教学工作',
-          description: '在这里您可以创建课程，管理学生，布置作业，开展在线教学活动。',
-        }
-      case 'ADMIN':
-        return {
-          title: `欢迎回来，管理员 ${user.username}！`,
-          subtitle: '管理平台运营',
-          description: '在这里您可以管理用户，监控系统运行，查看数据分析，配置系统设置。',
-        }
-      default:
-        return {
-          title: `欢迎回来，${user.username}！`,
-          subtitle: '欢迎使用在线教育平台',
-          description: '开始使用平台功能。',
-        }
-    }
-  }
-
-  const getFeatures = () => {
-    switch (user.role) {
-      case 'STUDENT':
-        return getStudentFeatures()
-      case 'INSTRUCTOR':
-        return getInstructorFeatures()
-      case 'ADMIN':
-        return getAdminFeatures()
-      default:
-        return []
-    }
-  }
-
-  const welcomeMessage = getWelcomeMessage()
-  const features = getFeatures()
+  const features = getAllFeatures()
 
   return (
     <div style={{ padding: '24px' }}>

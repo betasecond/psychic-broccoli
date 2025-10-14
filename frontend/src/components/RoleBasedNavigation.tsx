@@ -13,24 +13,20 @@ import {
   MessageOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAppSelector } from '../store'
 
 type MenuItem = Required<MenuProps>['items'][number]
 
 const RoleBasedNavigation: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAppSelector(state => state.auth)
-
-  if (!user) {
-    return null
-  }
 
   const handleMenuClick = (path: string) => {
     navigate(path)
   }
 
-  const getStudentMenuItems = (): MenuItem[] => [
+  // All available menu items for all roles
+  const getAllMenuItems = (): MenuItem[] => [
+    // Student-related items
     {
       key: '/student/dashboard',
       icon: <DashboardOutlined />,
@@ -73,9 +69,10 @@ const RoleBasedNavigation: React.FC = () => {
       label: '消息通知',
       onClick: () => handleMenuClick('/student/messages'),
     },
-  ]
-
-  const getInstructorMenuItems = (): MenuItem[] => [
+    // Teacher-related items
+    {
+      type: 'divider',
+    },
     {
       key: '/teacher/dashboard',
       icon: <DashboardOutlined />,
@@ -166,9 +163,10 @@ const RoleBasedNavigation: React.FC = () => {
       label: '教学分析',
       onClick: () => handleMenuClick('/teacher/analytics'),
     },
-  ]
-
-  const getAdminMenuItems = (): MenuItem[] => [
+    // Admin-related items
+    {
+      type: 'divider',
+    },
     {
       key: '/admin/dashboard',
       icon: <DashboardOutlined />,
@@ -233,41 +231,36 @@ const RoleBasedNavigation: React.FC = () => {
     },
   ]
 
-  const getMenuItems = (): MenuItem[] => {
-    switch (user.role) {
-      case 'STUDENT':
-        return getStudentMenuItems()
-      case 'INSTRUCTOR':
-        return getInstructorMenuItems()
-      case 'ADMIN':
-        return getAdminMenuItems()
-      default:
-        return []
-    }
-  }
-
   const getCurrentSelectedKeys = (): string[] => {
     const path = location.pathname
-    // Find the best matching menu item
-    const menuItems = getMenuItems()
+    
+    // Find all possible matches
+    const allMenuItems = getAllMenuItems()
+    const flattenedItems: MenuItem[] = []
+    
+    allMenuItems.forEach(item => {
+      if (item && typeof item === 'object') {
+        flattenedItems.push(item)
+        // Add children to the flattened list for matching as well
+        if ('children' in item && item.children) {
+          (item.children as MenuItem[]).forEach(child => {
+            if (child && typeof child === 'object' && 'key' in child) {
+              flattenedItems.push(child)
+            }
+          })
+        }
+      }
+    })
     
     // First try exact match
-    for (const item of menuItems) {
+    for (const item of flattenedItems) {
       if (item && typeof item === 'object' && 'key' in item && item.key === path) {
         return [path]
-      }
-      // Check children for exact match
-      if (item && typeof item === 'object' && 'children' in item && item.children) {
-        for (const child of item.children) {
-          if (child && typeof child === 'object' && 'key' in child && child.key === path) {
-            return [path]
-          }
-        }
       }
     }
     
     // If no exact match, try to find parent match
-    for (const item of menuItems) {
+    for (const item of flattenedItems) {
       if (item && typeof item === 'object' && 'key' in item) {
         const itemKey = item.key as string
         if (path.startsWith(itemKey)) {
@@ -281,11 +274,11 @@ const RoleBasedNavigation: React.FC = () => {
 
   const getCurrentOpenKeys = (): string[] => {
     const path = location.pathname
-    const menuItems = getMenuItems()
+    const allMenuItems = getAllMenuItems()
     
-    for (const item of menuItems) {
+    for (const item of allMenuItems) {
       if (item && typeof item === 'object' && 'children' in item && item.children) {
-        for (const child of item.children) {
+        for (const child of item.children as MenuItem[]) {
           if (child && typeof child === 'object' && 'key' in child && path.startsWith(child.key as string)) {
             return [item.key as string]
           }
@@ -301,7 +294,7 @@ const RoleBasedNavigation: React.FC = () => {
       mode="inline"
       selectedKeys={getCurrentSelectedKeys()}
       defaultOpenKeys={getCurrentOpenKeys()}
-      items={getMenuItems()}
+      items={getAllMenuItems()}
       style={{
         height: '100%',
         borderRight: 0,
