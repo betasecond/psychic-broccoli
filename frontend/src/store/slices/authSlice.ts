@@ -23,11 +23,16 @@ export interface AuthState {
   error: string | null
 }
 
-// Initial state
+// Initial state - with a default guest user for non-auth mode
 const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: false,
+  user: {
+    userId: 1,
+    username: '访客',
+    email: 'guest@example.com',
+    role: 'STUDENT'
+  },
+  token: 'guest-token', // Default token for non-auth mode
+  isAuthenticated: true, // Considered authenticated in non-auth mode
   loading: false,
   error: null,
 }
@@ -160,12 +165,16 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout: state => {
-      state.user = null
-      state.token = null
-      state.isAuthenticated = false
+      // In non-auth mode, keep default user instead of logging out
+      state.user = {
+        userId: 1,
+        username: '访客',
+        email: 'guest@example.com',
+        role: 'STUDENT'
+      }
+      state.token = 'guest-token'
+      state.isAuthenticated = true
       state.error = null
-      // Clear session using session manager
-      sessionManager.clearSession()
     },
     clearError: state => {
       state.error = null
@@ -223,12 +232,8 @@ const authSlice = createSlice({
       })
       .addCase(getCurrentUserAsync.rejected, (state, action) => {
         state.loading = false
-        state.user = null
-        state.token = null
-        state.isAuthenticated = false
+        // In non-auth mode, keep default user instead of setting to null
         state.error = action.payload as string
-        // Clear session using session manager
-        sessionManager.clearSession()
       })
       // Update profile
       .addCase(updateProfileAsync.pending, state => {
@@ -262,17 +267,28 @@ const authSlice = createSlice({
         state.loading = true
       })
       .addCase(logoutAsyncThunk.fulfilled, state => {
-        state.user = null
-        state.token = null
-        state.isAuthenticated = false
+        // In non-auth mode, keep default user instead of logging out
+        state.user = {
+          userId: 1,
+          username: '访客',
+          email: 'guest@example.com',
+          role: 'STUDENT'
+        }
+        state.token = 'guest-token'
+        state.isAuthenticated = true
         state.loading = false
         state.error = null
       })
       .addCase(logoutAsyncThunk.rejected, state => {
-        // Even if logout fails, clear the state
-        state.user = null
-        state.token = null
-        state.isAuthenticated = false
+        // Even if logout fails, keep default user in non-auth mode
+        state.user = {
+          userId: 1,
+          username: '访客',
+          email: 'guest@example.com',
+          role: 'STUDENT'
+        }
+        state.token = 'guest-token'
+        state.isAuthenticated = true
         state.loading = false
         state.error = null
       })
