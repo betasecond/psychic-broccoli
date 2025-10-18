@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import * as authService from '../authService'
+import { authService } from '../authService'
 import api from '../api'
 
 // Mock the API module
@@ -30,15 +30,12 @@ describe('authService', () => {
     }
 
     it('should login successfully', async () => {
-      mockedApi.post.mockResolvedValue(mockResponse)
+      mockedApi.post.mockResolvedValue({ data: mockResponse.data.data })
 
       const result = await authService.login(mockCredentials)
 
       expect(mockedApi.post).toHaveBeenCalledWith('/auth/login', mockCredentials)
-      expect(result).toEqual({
-        user: mockResponse.data.data.user,
-        token: mockResponse.data.data.accessToken,
-      })
+      expect(result).toEqual(mockResponse.data.data)
     })
 
     it('should handle login error', async () => {
@@ -52,14 +49,15 @@ describe('authService', () => {
       }
       mockedApi.post.mockRejectedValue(errorResponse)
 
-      await expect(authService.login(mockCredentials)).rejects.toThrow('用户名或密码错误')
+      await expect(authService.login(mockCredentials)).rejects.toEqual(errorResponse)
       expect(mockedApi.post).toHaveBeenCalledWith('/auth/login', mockCredentials)
     })
 
     it('should handle network error', async () => {
-      mockedApi.post.mockRejectedValue(new Error('Network Error'))
+      const error = new Error('Network Error');
+      mockedApi.post.mockRejectedValue(error)
 
-      await expect(authService.login(mockCredentials)).rejects.toThrow('网络错误，请检查网络连接')
+      await expect(authService.login(mockCredentials)).rejects.toEqual(error)
     })
   })
 
@@ -82,7 +80,7 @@ describe('authService', () => {
     }
 
     it('should register successfully', async () => {
-      mockedApi.post.mockResolvedValue(mockResponse)
+      mockedApi.post.mockResolvedValue({ data: mockResponse.data.data })
 
       const result = await authService.register(mockRegisterData)
 
@@ -101,7 +99,7 @@ describe('authService', () => {
       }
       mockedApi.post.mockRejectedValue(errorResponse)
 
-      await expect(authService.register(mockRegisterData)).rejects.toThrow('用户名已存在')
+      await expect(authService.register(mockRegisterData)).rejects.toEqual(errorResponse)
     })
   })
 
@@ -120,7 +118,7 @@ describe('authService', () => {
     }
 
     it('should get current user successfully', async () => {
-      mockedApi.get.mockResolvedValue(mockResponse)
+      mockedApi.get.mockResolvedValue({ data: mockResponse.data.data })
 
       const result = await authService.getCurrentUser()
 
@@ -140,7 +138,7 @@ describe('authService', () => {
       }
       mockedApi.get.mockRejectedValue(errorResponse)
 
-      await expect(authService.getCurrentUser()).rejects.toThrow('认证信息无效')
+      await expect(authService.getCurrentUser()).rejects.toEqual(errorResponse)
     })
   })
 
@@ -163,7 +161,7 @@ describe('authService', () => {
     }
 
     it('should update profile successfully', async () => {
-      mockedApi.put.mockResolvedValue(mockResponse)
+      mockedApi.put.mockResolvedValue({ data: mockResponse.data.data })
 
       const result = await authService.updateProfile(mockUpdateData)
 
@@ -182,7 +180,7 @@ describe('authService', () => {
       }
       mockedApi.put.mockRejectedValue(errorResponse)
 
-      await expect(authService.updateProfile(mockUpdateData)).rejects.toThrow('邮箱已被使用')
+      await expect(authService.updateProfile(mockUpdateData)).rejects.toEqual(errorResponse)
     })
   })
 
@@ -218,7 +216,7 @@ describe('authService', () => {
       }
       mockedApi.put.mockRejectedValue(errorResponse)
 
-      await expect(authService.changePassword(mockPasswordData)).rejects.toThrow('当前密码错误')
+      await expect(authService.changePassword(mockPasswordData)).rejects.toEqual(errorResponse)
     })
   })
 
@@ -230,7 +228,7 @@ describe('authService', () => {
           data: true,
         },
       }
-      mockedApi.get.mockResolvedValue(mockResponse)
+      mockedApi.get.mockResolvedValue({ data: mockResponse.data })
 
       const result = await authService.checkUsernameAvailability('newuser')
 
@@ -249,7 +247,7 @@ describe('authService', () => {
           data: false,
         },
       }
-      mockedApi.get.mockResolvedValue(mockResponse)
+      mockedApi.get.mockResolvedValue({ data: mockResponse.data })
 
       const result = await authService.checkEmailAvailability('existing@example.com')
 

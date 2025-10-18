@@ -23,16 +23,11 @@ export interface AuthState {
   error: string | null
 }
 
-// Initial state - with a default guest user for non-auth mode
+// Initial state - attempting to load user from session
 const initialState: AuthState = {
-  user: {
-    userId: 1,
-    username: '访客',
-    email: 'guest@example.com',
-    role: 'STUDENT'
-  },
-  token: 'guest-token', // Default token for non-auth mode
-  isAuthenticated: true, // Considered authenticated in non-auth mode
+  user: sessionManager.getUser(),
+  token: sessionManager.getToken(),
+  isAuthenticated: !!sessionManager.getToken(),
   loading: false,
   error: null,
 }
@@ -50,12 +45,7 @@ export const loginAsync = createAsyncThunk(
       sessionManager.saveSession(response.accessToken, response.user)
       return response
     } catch (error) {
-      const errorMessage =
-        error instanceof Error && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response
-              ?.data?.message || '登录失败，请重试'
-          : '登录失败，请重试'
-      return rejectWithValue(errorMessage)
+      return rejectWithValue(error)
     }
   }
 )
@@ -165,15 +155,9 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout: state => {
-      // In non-auth mode, keep default user instead of logging out
-      state.user = {
-        userId: 1,
-        username: '访客',
-        email: 'guest@example.com',
-        role: 'STUDENT'
-      }
-      state.token = 'guest-token'
-      state.isAuthenticated = true
+      state.user = null
+      state.token = null
+      state.isAuthenticated = false
       state.error = null
     },
     clearError: state => {
@@ -232,7 +216,9 @@ const authSlice = createSlice({
       })
       .addCase(getCurrentUserAsync.rejected, (state, action) => {
         state.loading = false
-        // In non-auth mode, keep default user instead of setting to null
+        state.user = null
+        state.token = null
+        state.isAuthenticated = false
         state.error = action.payload as string
       })
       // Update profile
@@ -267,28 +253,17 @@ const authSlice = createSlice({
         state.loading = true
       })
       .addCase(logoutAsyncThunk.fulfilled, state => {
-        // In non-auth mode, keep default user instead of logging out
-        state.user = {
-          userId: 1,
-          username: '访客',
-          email: 'guest@example.com',
-          role: 'STUDENT'
-        }
-        state.token = 'guest-token'
-        state.isAuthenticated = true
+        state.user = null
+        state.token = null
+        state.isAuthenticated = false
         state.loading = false
         state.error = null
       })
       .addCase(logoutAsyncThunk.rejected, state => {
-        // Even if logout fails, keep default user in non-auth mode
-        state.user = {
-          userId: 1,
-          username: '访客',
-          email: 'guest@example.com',
-          role: 'STUDENT'
-        }
-        state.token = 'guest-token'
-        state.isAuthenticated = true
+        // Even if logout fails, clear local state
+        state.user = null
+        state.token = null
+        state.isAuthenticated = false
         state.loading = false
         state.error = null
       })

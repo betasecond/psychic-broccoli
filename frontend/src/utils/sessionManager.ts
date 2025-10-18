@@ -232,6 +232,25 @@ class SessionManager {
   }
 
   /**
+   * Get user from localStorage
+   */
+  getUser(): any | null {
+    try {
+      const userStr = localStorage.getItem(USER_KEY)
+      return userStr ? JSON.parse(userStr) : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  /**
+   * Get token from localStorage
+   */
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY)
+  }
+
+  /**
    * Cleanup session manager
    */
   cleanup(): void {

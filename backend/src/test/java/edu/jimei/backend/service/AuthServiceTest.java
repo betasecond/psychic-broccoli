@@ -316,27 +316,27 @@ class AuthServiceTest {
     void updateProfile_WithValidRequest_ShouldReturnUpdatedUserResponse() {
         // Arrange
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(userRepository.existsByEmail("updated@example.com")).thenReturn(false);
-        
+        when(userRepository.existsByEmailAndIdNot(anyString(), anyLong())).thenReturn(false);
+
         User updatedUser = new User();
         updatedUser.setId(1L);
         updatedUser.setUsername("testuser");
         updatedUser.setEmail("updated@example.com");
         updatedUser.setAvatarUrl("https://example.com/avatar.jpg");
         updatedUser.setRole(UserRole.STUDENT);
-        
+
         when(userRepository.save(any(User.class))).thenReturn(updatedUser);
-        
+
         // Act
         UserResponse response = authService.updateProfile(1L, validUpdateRequest);
-        
+
         // Assert
         assertNotNull(response);
         assertEquals("updated@example.com", response.getEmail());
         assertEquals("https://example.com/avatar.jpg", response.getAvatarUrl());
-        
+
         verify(userRepository).findById(1L);
-        verify(userRepository).existsByEmail("updated@example.com");
+        verify(userRepository).existsByEmailAndIdNot("updated@example.com", 1L);
         verify(userRepository).save(any(User.class));
     }
     
