@@ -136,6 +136,22 @@ class AuthService {
   setToken(token: string): void {
     localStorage.setItem('token', token)
   }
+
+  /**
+   * Check username availability
+   */
+  async checkUsernameAvailability(username: string): Promise<boolean> {
+    const response = await api.get('/auth/check-username', { params: { username } })
+    return response.data.data
+  }
+
+  /**
+   * Check email availability
+   */
+  async checkEmailAvailability(email: string): Promise<boolean> {
+    const response = await api.get('/auth/check-email', { params: { email } })
+    return response.data.data
+  }
 }
 
 // Export singleton instance

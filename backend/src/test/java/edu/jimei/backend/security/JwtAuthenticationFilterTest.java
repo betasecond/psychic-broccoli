@@ -31,7 +31,7 @@ class JwtAuthenticationFilterTest {
     private JwtUtils jwtUtils;
 
     @Mock
-    private UserRepository userRepository;
+    private UserDetailsService userDetailsService;
 
     @Mock
     private HttpServletRequest request;
@@ -62,23 +62,24 @@ class JwtAuthenticationFilterTest {
         // Arrange
         String token = "valid.jwt.token";
         String authHeader = "Bearer " + token;
-        
+        UserPrincipal userPrincipal = new UserPrincipal(1L, "testuser", "STUDENT");
+
         when(request.getHeader("Authorization")).thenReturn(authHeader);
         when(jwtUtils.validateJwtToken(token)).thenReturn(true);
-        when(jwtUtils.getUserIdFromJwtToken(token)).thenReturn(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(jwtUtils.getUsernameFromJwtToken(token)).thenReturn("testuser");
+        when(userDetailsService.loadUserByUsername("testuser")).thenReturn(userPrincipal);
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-        assertEquals("testuser", SecurityContextHolder.getContext().getAuthentication().getName());
+        assertEquals("testuser", ((UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUsername());
         
         verify(filterChain).doFilter(request, response);
         verify(jwtUtils).validateJwtToken(token);
-        verify(jwtUtils).getUserIdFromJwtToken(token);
-        verify(userRepository).findById(1L);
+        verify(jwtUtils).getUsernameFromJwtToken(token);
+        verify(userDetailsService).loadUserByUsername("testuser");
     }
 
     @Test
@@ -158,8 +159,8 @@ class JwtAuthenticationFilterTest {
         
         when(request.getHeader("Authorization")).thenReturn(authHeader);
         when(jwtUtils.validateJwtToken(token)).thenReturn(true);
-        when(jwtUtils.getUserIdFromJwtToken(token)).thenReturn(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(jwtUtils.getUsernameFromJwtToken(token)).thenReturn("notfounduser");
+        when(userDetailsService.loadUserByUsername("notfounduser")).thenThrow(new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found"));
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -169,8 +170,8 @@ class JwtAuthenticationFilterTest {
         
         verify(filterChain).doFilter(request, response);
         verify(jwtUtils).validateJwtToken(token);
-        verify(jwtUtils).getUserIdFromJwtToken(token);
-        verify(userRepository).findById(1L);
+        verify(jwtUtils).getUsernameFromJwtToken(token);
+        verify(userDetailsService).loadUserByUsername("notfounduser");
     }
 
     @Test
@@ -206,15 +207,20 @@ class JwtAuthenticationFilterTest {
                         existingPrincipal, null, java.util.Collections.emptyList()));
         
         when(request.getHeader("Authorization")).thenReturn(authHeader);
+        when(jwtUtils.validateJwtToken(token)).thenReturn(true);
+        when(jwtUtils.getUsernameFromJwtToken(token)).thenReturn("existinguser");
+        when(userDetailsService.loadUserByUsername("existinguser")).thenReturn(existingPrincipal);
+
 
         // Act
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        assertEquals("existinguser", SecurityContextHolder.getContext().getAuthentication().getName());
+        assertEquals("existinguser", ((UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUsername());
         
         verify(filterChain).doFilter(request, response);
-        verify(jwtUtils, never()).validateJwtToken(anyString());
-        verify(userRepository, never()).findById(anyLong());
+        verify(jwtUtils).validateJwtToken(token);
+        verify(jwtUtils).getUsernameFromJwtToken(token);
+        verify(userDetailsService).loadUserByUsername("existinguser");
     }
 }
