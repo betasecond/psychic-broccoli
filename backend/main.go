@@ -79,6 +79,8 @@ func main() {
 			authenticated := courses.Group("")
 			authenticated.Use(middleware.AuthMiddleware())
 			{
+				authenticated.GET("/my", handlers.GetMyCourses)
+				authenticated.GET("/:id/statistics", handlers.GetCourseStatistics)
 				authenticated.POST("", handlers.CreateCourse)
 				authenticated.PUT("/:id", handlers.UpdateCourse)
 				authenticated.DELETE("/:id", handlers.DeleteCourse)
@@ -94,12 +96,15 @@ func main() {
 		assignments.Use(middleware.AuthMiddleware())
 		{
 			assignments.GET("", handlers.GetAssignments)
+			assignments.GET("/my", handlers.GetMyAssignments)
 			assignments.POST("", handlers.CreateAssignment)
 			assignments.GET("/:id", handlers.GetAssignment)
+			assignments.GET("/:id/statistics", handlers.GetAssignmentStatistics)
 			assignments.PUT("/:id", handlers.UpdateAssignment)
 			assignments.DELETE("/:id", handlers.DeleteAssignment)
 			assignments.POST("/:id/submit", handlers.SubmitAssignment)
 			assignments.GET("/submissions", handlers.GetSubmissions)
+			assignments.GET("/submissions/:id", handlers.GetSubmissionDetail)
 			assignments.PUT("/submissions/:id/grade", handlers.GradeSubmission)
 		}
 
@@ -108,8 +113,11 @@ func main() {
 		exams.Use(middleware.AuthMiddleware())
 		{
 			exams.GET("", handlers.GetExams)
+			exams.GET("/my", handlers.GetMyExams)
 			exams.POST("", handlers.CreateExam)
 			exams.GET("/:id", handlers.GetExam)
+			exams.GET("/:id/statistics", handlers.GetExamStatistics)
+			exams.GET("/:id/my-submission", handlers.GetMyExamSubmission)
 			exams.PUT("/:id", handlers.UpdateExam)
 			exams.DELETE("/:id", handlers.DeleteExam)
 			exams.POST("/:id/questions", handlers.AddQuestion)
@@ -117,6 +125,7 @@ func main() {
 			exams.DELETE("/:id/questions/:qid", handlers.DeleteQuestion)
 			exams.POST("/:id/submit", handlers.SubmitExam)
 			exams.GET("/:id/results", handlers.GetExamResults)
+			exams.GET("/submissions/:id", handlers.GetExamSubmissionDetail)
 		}
 	}
 

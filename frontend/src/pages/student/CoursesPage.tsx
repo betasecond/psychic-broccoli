@@ -1,43 +1,28 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tag } from 'antd';
+import React, { useEffect } from 'react';
+import { Card, Row, Col, Button, Typography, Space, Table, Tag, Spin, message } from 'antd';
 import { BookOutlined, StarOutlined, CalendarOutlined, PlayCircleOutlined, SearchOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector, selectMyCourses, selectCourseLoading, selectCourseError } from '../../store';
+import { fetchMyCourses } from '../../store/slices/courseSlice';
 
 const { Title, Text } = Typography;
 
 const CoursesPage: React.FC = () => {
-  // 模拟课程数据
-  const courses = [
-    {
-      id: '1',
-      title: '前端开发基础',
-      instructor: '张老师',
-      progress: 75,
-      status: '进行中',
-      category: '编程',
-      startDate: '2024-01-15',
-      endDate: '2024-03-15',
-    },
-    {
-      id: '2',
-      title: 'React 深入浅出',
-      instructor: '李老师',
-      progress: 40,
-      status: '进行中',
-      category: '前端',
-      startDate: '2024-02-01',
-      endDate: '2024-04-01',
-    },
-    {
-      id: '3',
-      title: 'TypeScript 实战',
-      instructor: '王老师',
-      progress: 100,
-      status: '已完成',
-      category: '编程',
-      startDate: '2023-12-01',
-      endDate: '2024-01-15',
-    },
-  ];
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const courses = useAppSelector(selectMyCourses);
+  const loading = useAppSelector(selectCourseLoading);
+  const error = useAppSelector(selectCourseError);
+
+  useEffect(() => {
+    dispatch(fetchMyCourses());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      message.error(error);
+    }
+  }, [error]);
 
   const columns = [
     {
@@ -48,15 +33,15 @@ const CoursesPage: React.FC = () => {
     },
     {
       title: '授课教师',
-      dataIndex: 'instructor',
-      key: 'instructor',
+      dataIndex: 'instructorName',
+      key: 'instructorName',
     },
     {
       title: '类别',
-      dataIndex: 'category',
-      key: 'category',
+      dataIndex: 'categoryName',
+      key: 'categoryName',
       render: (category: string) => (
-        <Tag color={category === '编程' ? 'blue' : 'green'}>{category}</Tag>
+        category ? <Tag color="blue">{category}</Tag> : <Text type="secondary">-</Text>
       ),
     },
     {
@@ -64,13 +49,13 @@ const CoursesPage: React.FC = () => {
       key: 'progress',
       render: (record: any) => (
         <div>
-          <div>{record.progress}%</div>
+          <div>{record.progress || 0}%</div>
           <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
             <div 
               style={{ 
-                width: `${record.progress}%`, 
+                width: `${record.progress || 0}%`, 
                 height: '8px', 
-                backgroundColor: record.progress === 100 ? '#52c41a' : '#1890ff',
+                backgroundColor: (record.progress || 0) === 100 ? '#52c41a' : '#1890ff',
                 borderRadius: '4px'
               }}
             />
@@ -80,23 +65,39 @@ const CoursesPage: React.FC = () => {
     },
     {
       title: '状态',
-      dataIndex: 'status',
       key: 'status',
-      render: (status: string) => (
-        <Tag color={status === '已完成' ? 'green' : 'orange'}>{status}</Tag>
-      ),
+      render: (record: any) => {
+        const progress = record.progress || 0;
+        return (
+          <Tag color={progress === 100 ? 'green' : 'orange'}>
+            {progress === 100 ? '已完成' : '进行中'}
+          </Tag>
+        );
+      },
     },
     {
       title: '操作',
       key: 'action',
-      render: () => (
+      render: (record: any) => (
         <Space size="middle">
-          <Button type="link">查看</Button>
-          <Button type="link">继续学习</Button>
+          <Button type="link" onClick={() => navigate(`/student/courses/${record.id}`)}>
+            查看
+          </Button>
+          <Button type="link" onClick={() => navigate(`/student/courses/${record.id}`)}>
+            继续学习
+          </Button>
         </Space>
       ),
     },
   ];
+
+  if (loading && courses.length === 0) {
+    return (
+      <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Spin size="large" tip="加载中..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '24px' }}>
@@ -110,8 +111,9 @@ const CoursesPage: React.FC = () => {
           <Card>
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Space>
-                <Button type="primary">报名新课程</Button>
-                <Button>我的收藏</Button>
+                <Button type="primary" onClick={() => navigate('/student/courses/all')}>
+                  报名新课程
+                </Button>
               </Space>
               <Space>
                 <Button icon={<SearchOutlined />}>搜索</Button>
@@ -122,6 +124,7 @@ const CoursesPage: React.FC = () => {
               dataSource={courses} 
               columns={columns} 
               rowKey="id"
+              loading={loading}
               pagination={{
                 pageSize: 5,
                 showSizeChanger: true,
@@ -133,73 +136,47 @@ const CoursesPage: React.FC = () => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BookOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="前端开发基础"
-              description="学习HTML, CSS, JavaScript基础知识"
-            />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <StarOutlined style={{ color: '#faad14' }} /> 4.8
-              </div>
-              <Button type="link">继续学习</Button>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <PlayCircleOutlined style={{ fontSize: '48px', color: '#fa8c16' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="React 深入浅出"
-              description="掌握React核心概念和最佳实践"
-            />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <StarOutlined style={{ color: '#faad14' }} /> 4.9
-              </div>
-              <Button type="link">继续学习</Button>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CalendarOutlined style={{ fontSize: '48px', color: '#52c41a' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="TypeScript 实战"
-              description="TypeScript在项目中的实际应用"
-            />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <StarOutlined style={{ color: '#faad14' }} /> 4.7
-              </div>
-              <Button type="link">查看详情</Button>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+      {courses.length > 0 && (
+        <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+          {courses.slice(0, 3).map((course, index) => {
+            const colors = ['#e6f7ff', '#fff7e6', '#f6ffed'];
+            const iconColors = ['#1890ff', '#fa8c16', '#52c41a'];
+            const icons = [BookOutlined, PlayCircleOutlined, CalendarOutlined];
+            const Icon = icons[index % 3];
+            
+            return (
+              <Col xs={24} sm={12} md={8} key={course.id}>
+                <Card 
+                  hoverable
+                  cover={
+                    <div style={{ 
+                      height: '120px', 
+                      backgroundColor: colors[index % 3], 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center' 
+                    }}>
+                      <Icon style={{ fontSize: '48px', color: iconColors[index % 3] }} />
+                    </div>
+                  }
+                  onClick={() => navigate(`/student/courses/${course.id}`)}
+                >
+                  <Card.Meta
+                    title={course.title}
+                    description={course.description || '暂无描述'}
+                  />
+                  <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <StarOutlined style={{ color: '#faad14' }} /> {course.instructorName}
+                    </div>
+                    <Button type="link">继续学习</Button>
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+      )}
     </div>
   );
 };

@@ -4,7 +4,7 @@ Write-Host "  API 测试脚本" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
 
-$baseUrl = "http://localhost:8080"
+$baseUrl = "http://localhost:8081"
 
 # 测试健康检查
 Write-Host "1️⃣  测试健康检查..." -ForegroundColor Yellow

@@ -1,53 +1,42 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tag, Progress } from 'antd';
+import React, { useEffect } from 'react';
+import { Card, Row, Col, Button, Typography, Space, Table, Tag, Progress, Spin, message } from 'antd';
 import { FileTextOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector, selectMyAssignments, selectAssignmentLoading, selectAssignmentError } from '../../store';
+import { fetchMyAssignments } from '../../store/slices/assignmentSlice';
 
 const { Title, Text } = Typography;
 
 const AssignmentsPage: React.FC = () => {
-  // 模拟作业数据
-  const assignments = [
-    {
-      id: '1',
-      title: 'React 组件设计作业',
-      course: 'React 深入浅出',
-      dueDate: '2024-03-15',
-      status: '待提交',
-      progress: 0,
-      grade: '-',
-      type: '编程作业'
-    },
-    {
-      id: '2',
-      title: 'TypeScript 类型系统练习',
-      course: 'TypeScript 实战',
-      dueDate: '2024-02-20',
-      status: '已提交',
-      progress: 100,
-      grade: '85',
-      type: '编程作业'
-    },
-    {
-      id: '3',
-      title: '前端框架对比分析',
-      course: '前端开发基础',
-      dueDate: '2024-01-30',
-      status: '已批改',
-      progress: 100,
-      grade: '92',
-      type: '论文'
-    },
-    {
-      id: '4',
-      title: 'CSS 布局实战',
-      course: '前端开发基础',
-      dueDate: '2024-02-10',
-      status: '已批改',
-      progress: 100,
-      grade: '88',
-      type: '编程作业'
-    },
-  ];
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const assignments = useAppSelector(selectMyAssignments);
+  const loading = useAppSelector(selectAssignmentLoading);
+  const error = useAppSelector(selectAssignmentError);
+
+  useEffect(() => {
+    dispatch(fetchMyAssignments());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      message.error(error);
+    }
+  }, [error]);
+
+  // 计算统计数据
+  const stats = React.useMemo(() => {
+    const pending = assignments.filter(a => !a.submitted);
+    const submitted = assignments.filter(a => a.submitted && !a.graded);
+    const graded = assignments.filter(a => a.graded);
+    
+    return {
+      pending: pending.length,
+      submitted: submitted.length,
+      graded: graded.length,
+      total: assignments.length,
+    };
+  }, [assignments]);
 
   const columns = [
     {
@@ -58,57 +47,48 @@ const AssignmentsPage: React.FC = () => {
     },
     {
       title: '课程',
-      dataIndex: 'course',
-      key: 'course',
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: string) => (
-        <Tag color={type === '编程作业' ? 'blue' : 'green'}>{type}</Tag>
-      ),
+      dataIndex: 'courseTitle',
+      key: 'courseTitle',
     },
     {
       title: '截止日期',
-      dataIndex: 'dueDate',
-      key: 'dueDate',
+      dataIndex: 'deadline',
+      key: 'deadline',
       render: (date: string) => (
-        <Space>
-          <CalendarOutlined />
-          <span>{date}</span>
-        </Space>
+        date ? (
+          <Space>
+            <CalendarOutlined />
+            <span>{new Date(date).toLocaleDateString('zh-CN')}</span>
+          </Space>
+        ) : <Text type="secondary">无</Text>
       ),
     },
     {
       title: '状态',
-      dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
+      render: (record: any) => {
         let color = 'default';
         let icon = null;
+        let statusText = '待提交';
         
-        switch(status) {
-          case '待提交':
-            color = 'orange';
-            icon = <ClockCircleOutlined />;
-            break;
-          case '已提交':
-            color = 'blue';
-            icon = <CheckCircleOutlined />;
-            break;
-          case '已批改':
-            color = 'green';
-            icon = <CheckCircleOutlined />;
-            break;
-          default:
-            color = 'default';
+        if (record.graded) {
+          color = 'green';
+          icon = <CheckCircleOutlined />;
+          statusText = '已批改';
+        } else if (record.submitted) {
+          color = 'blue';
+          icon = <CheckCircleOutlined />;
+          statusText = '已提交';
+        } else {
+          color = 'orange';
+          icon = <ClockCircleOutlined />;
+          statusText = '待提交';
         }
         
         return (
           <Space>
             {icon}
-            <Tag color={color}>{status}</Tag>
+            <Tag color={color}>{statusText}</Tag>
           </Space>
         );
       },
@@ -117,9 +97,9 @@ const AssignmentsPage: React.FC = () => {
       title: '成绩',
       dataIndex: 'grade',
       key: 'grade',
-      render: (grade: string) => (
+      render: (grade: number | undefined) => (
         <div>
-          {grade !== '-' ? (
+          {grade !== undefined && grade !== null ? (
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{ fontSize: '16px', fontWeight: 'bold' }}>{grade}</span>
               <span style={{ marginLeft: '4px' }}>/100</span>
@@ -135,16 +115,23 @@ const AssignmentsPage: React.FC = () => {
       key: 'action',
       render: (record: any) => (
         <Space size="middle">
-          {record.status === '待提交' ? (
-            <Button type="primary">提交作业</Button>
+          {!record.submitted ? (
+            <Button type="primary" onClick={() => navigate(`/student/assignments/${record.id}`)}>提交作业</Button>
           ) : (
-            <Button type="link">查看详情</Button>
+            <Button type="link" onClick={() => navigate(`/student/assignments/${record.id}`)}>查看详情</Button>
           )}
-          <Button type="link">下载</Button>
         </Space>
       ),
     },
   ];
+
+  if (loading && assignments.length === 0) {
+    return (
+      <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Spin size="large" tip="加载中..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '24px' }}>
@@ -158,12 +145,8 @@ const AssignmentsPage: React.FC = () => {
           <Card>
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Space>
-                <Button type="primary">查看全部作业</Button>
-                <Button>我的待完成</Button>
-              </Space>
-              <Space>
-                <Button>按课程筛选</Button>
-                <Button>按状态筛选</Button>
+                <FileTextOutlined style={{ fontSize: '18px' }} />
+                <Text strong>共 {stats.total} 个作业</Text>
               </Space>
             </div>
             
@@ -171,6 +154,7 @@ const AssignmentsPage: React.FC = () => {
               dataSource={assignments} 
               columns={columns} 
               rowKey="id"
+              loading={loading}
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,
@@ -189,25 +173,34 @@ const AssignmentsPage: React.FC = () => {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <Text strong>待提交作业</Text>
-                  <Text strong type="warning">2 个</Text>
+                  <Text strong type="warning">{stats.pending} 个</Text>
                 </div>
-                <Progress percent={25} strokeColor="#fa8c16" />
+                <Progress 
+                  percent={stats.total > 0 ? Math.round((stats.pending / stats.total) * 100) : 0} 
+                  strokeColor="#fa8c16" 
+                />
               </div>
               
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <Text strong>已提交作业</Text>
-                  <Text strong type="secondary">1 个</Text>
+                  <Text strong type="secondary">{stats.submitted} 个</Text>
                 </div>
-                <Progress percent={50} strokeColor="#1890ff" />
+                <Progress 
+                  percent={stats.total > 0 ? Math.round((stats.submitted / stats.total) * 100) : 0} 
+                  strokeColor="#1890ff" 
+                />
               </div>
               
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <Text strong>已批改作业</Text>
-                  <Text strong type="success">2 个</Text>
+                  <Text strong type="success">{stats.graded} 个</Text>
                 </div>
-                <Progress percent={50} strokeColor="#52c41a" />
+                <Progress 
+                  percent={stats.total > 0 ? Math.round((stats.graded / stats.total) * 100) : 0} 
+                  strokeColor="#52c41a" 
+                />
               </div>
             </Space>
           </Card>

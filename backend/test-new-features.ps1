@@ -4,7 +4,7 @@ Write-Host "  测试新增CRUD功能" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
 
-$baseUrl = "http://localhost:8080"
+$baseUrl = "http://localhost:8081"
 
 # 1. 登录获取token
 Write-Host "1️⃣  登录教师账号..." -ForegroundColor Yellow

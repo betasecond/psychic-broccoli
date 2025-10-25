@@ -29,8 +29,8 @@ if (-not (Test-Path "database")) {
 # 启动服务器
 Write-Host ""
 Write-Host "🚀 正在启动后端服务器..." -ForegroundColor Green
-Write-Host "📍 监听地址: http://localhost:8080" -ForegroundColor Cyan
-Write-Host "📚 API基础路径: http://localhost:8080/api/v1" -ForegroundColor Cyan
+Write-Host "📍 监听地址: http://localhost:8081" -ForegroundColor Cyan
+Write-Host "📚 API基础路径: http://localhost:8081/api/v1" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "💡 提示:" -ForegroundColor Yellow
 Write-Host "   - 按 Ctrl+C 可停止服务器" -ForegroundColor White

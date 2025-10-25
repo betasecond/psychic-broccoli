@@ -1,11 +1,98 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar } from 'antd';
-import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined } from '@ant-design/icons';
+import React, { useState } from 'react';
+import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar, Modal, Upload, message } from 'antd';
+import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons';
+import type { UploadProps } from 'antd';
+import { userService } from '../../services/userService';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
+const { Dragger } = Upload;
 
 const UsersPage: React.FC = () => {
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileList, setFileList] = useState<any[]>([]);
+
+  // 下载导入模板
+  const handleDownloadTemplate = async () => {
+    try {
+      await userService.triggerDownloadTemplate();
+      message.success('模板下载成功！');
+    } catch (error) {
+      message.error('模板下载失败');
+    }
+  };
+
+  // 批量导入用户
+  const handleImport = async () => {
+    if (fileList.length === 0) {
+      message.warning('请先选择Excel文件');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const file = fileList[0].originFileObj;
+      const result = await userService.importUsersFromExcel(file);
+      
+      Modal.success({
+        title: '导入完成',
+        content: (
+          <div>
+            <p>成功导入：{result.successCount} 个用户</p>
+            {result.errorCount > 0 && (
+              <>
+                <p style={{ color: '#ff4d4f' }}>失败：{result.errorCount} 个用户</p>
+                {result.errors && result.errors.length > 0 && (
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '12px' }}>
+                    <Text type="secondary">错误详情：</Text>
+                    <ul>
+                      {result.errors.map((err, idx) => (
+                        <li key={idx} style={{ color: '#ff4d4f' }}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ),
+      });
+      
+      setImportModalVisible(false);
+      setFileList([]);
+      // 这里可以刷新用户列表
+    } catch (error: any) {
+      message.error(error.message || '导入失败');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadProps: UploadProps = {
+    name: 'file',
+    multiple: false,
+    accept: '.xlsx,.xls',
+    fileList,
+    beforeUpload: (file) => {
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                      file.type === 'application/vnd.ms-excel' ||
+                      file.name.endsWith('.xlsx') ||
+                      file.name.endsWith('.xls');
+      
+      if (!isExcel) {
+        message.error('只能上传Excel文件！');
+        return false;
+      }
+      
+      setFileList([file]);
+      return false; // 阻止自动上传
+    },
+    onRemove: () => {
+      setFileList([]);
+    },
+  };
+
   // 模拟用户数据
   const students = [
     {
@@ -351,7 +438,18 @@ const UsersPage: React.FC = () => {
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Space>
                 <Button type="primary">新增用户</Button>
-                <Button icon={<EditOutlined />}>批量操作</Button>
+                <Button 
+                  icon={<UploadOutlined />} 
+                  onClick={() => setImportModalVisible(true)}
+                >
+                  批量导入
+                </Button>
+                <Button 
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownloadTemplate}
+                >
+                  下载模板
+                </Button>
               </Space>
               <Space>
                 <Button icon={<SearchOutlined />}>搜索用户</Button>
@@ -555,6 +653,61 @@ const UsersPage: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 批量导入Modal */}
+      <Modal
+        title="批量导入用户"
+        open={importModalVisible}
+        onOk={handleImport}
+        onCancel={() => {
+          setImportModalVisible(false);
+          setFileList([]);
+        }}
+        okText="开始导入"
+        cancelText="取消"
+        confirmLoading={uploading}
+        width={600}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div>
+            <Paragraph>
+              请先下载模板，按照模板格式填写用户信息后再上传。
+            </Paragraph>
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={handleDownloadTemplate}
+              type="dashed"
+              block
+            >
+              下载Excel模板
+            </Button>
+          </div>
+
+          <div>
+            <Paragraph strong>上传Excel文件：</Paragraph>
+            <Dragger {...uploadProps}>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+              <p className="ant-upload-hint">
+                支持 .xlsx 和 .xls 格式的Excel文件
+              </p>
+            </Dragger>
+          </div>
+
+          <div style={{ padding: '12px', backgroundColor: '#f0f2f5', borderRadius: '4px' }}>
+            <Text strong>导入说明：</Text>
+            <ul style={{ marginTop: '8px', marginBottom: 0 }}>
+              <li>必填字段：用户名、密码、角色</li>
+              <li>角色可选值：STUDENT（学生）、INSTRUCTOR（教师）、ADMIN（管理员）</li>
+              <li>可选字段：邮箱、头像URL</li>
+              <li>用户名不能重复</li>
+              <li>请严格按照模板格式填写</li>
+            </ul>
+          </div>
+        </Space>
+      </Modal>
     </div>
   );
 };
