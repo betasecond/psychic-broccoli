@@ -11,10 +11,11 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:35001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:35001',
         changeOrigin: true,
         secure: false,
       },
