@@ -39,6 +39,9 @@ func main() {
 	// 使用中间件
 	r.Use(middleware.CORSMiddleware())
 
+    // 静态资源目录（用于作业附件等本地文件）
+    r.Static("/static", "./public")
+
 	// API v1路由组
 	v1 := r.Group("/api/v1")
 	{
@@ -92,13 +95,18 @@ func main() {
 		}
 
 		// 作业路由
+		assignmentsPublic := v1.Group("/assignments")
+		{
+			// 公开的作业详情
+			assignmentsPublic.GET("/:id", handlers.GetAssignment)
+		}
+
 		assignments := v1.Group("/assignments")
 		assignments.Use(middleware.AuthMiddleware())
 		{
 			assignments.GET("", handlers.GetAssignments)
 			assignments.GET("/my", handlers.GetMyAssignments)
 			assignments.POST("", handlers.CreateAssignment)
-			assignments.GET("/:id", handlers.GetAssignment)
 			assignments.GET("/:id/statistics", handlers.GetAssignmentStatistics)
 			assignments.PUT("/:id", handlers.UpdateAssignment)
 			assignments.DELETE("/:id", handlers.DeleteAssignment)

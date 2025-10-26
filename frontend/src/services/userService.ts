@@ -29,10 +29,10 @@ class UserService {
    * 下载用户导入模板
    */
   async downloadUserTemplate(): Promise<Blob> {
-    const response = await api.get('/auth/user-template', {
+    const blob = await api.get('/auth/user-template', {
       responseType: 'blob',
     })
-    return response.data
+    return blob
   }
 
   /**

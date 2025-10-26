@@ -1,10 +1,12 @@
 package database
 
 import (
-	"fmt"
-	"time"
+    "encoding/json"
+    "fmt"
+    "os"
+    "time"
 
-	"golang.org/x/crypto/bcrypt"
+    "golang.org/x/crypto/bcrypt"
 )
 
 // SeedData 填充测试数据
@@ -155,28 +157,82 @@ func SeedData() error {
 		(5, '生成器和迭代器', 2, 'VIDEO', 'https://www.w3schools.com/html/mov_bbb.mp4')
 	`)
 
-	fmt.Println("  ✓ 课时创建完成 (9个课时)")
+    fmt.Println("  ✓ 课时创建完成 (9个课时)")
 
-	// 7. 创建作业
+    // 7. 创建作业（含 Markdown 内容与本地附件示例）
+    // 准备本地静态附件目录与示例文件
+    _ = os.MkdirAll("public/assignments", 0755)
+    _ = os.WriteFile("public/assignments/go-basics-spec.md", []byte("# Go语言基础练习规范\n\n- 输入/输出\n- 基本计算\n\n```go\npackage main\nimport \"fmt\"\nfunc main(){\n\tfmt.Println(\"Hello Go\")\n}\n```\n"), 0644)
+    _ = os.WriteFile("public/assignments/go-basics-starter.txt", []byte("// 请在此文件中记录你的需求理解与步骤清单"), 0644)
+    _ = os.WriteFile("public/assignments/go-concurrency-spec.md", []byte("# Go 并发任务池规范\n\n- 可配置并发数\n- 正确退出\n- 单元测试\n"), 0644)
+    _ = os.WriteFile("public/assignments/python-data-sample.csv", []byte("id,name,score\n1,Alice,90\n2,Bob,78\n3,Carol,85\n"), 0644)
+    _ = os.WriteFile("public/assignments/react-usercard-design.md", []byte("# UserCard 组件设计\n\n- 头像/姓名/简介\n- 可配置尺寸与主题\n"), 0644)
+
+    toJSON := func(list []string) *string {
+        if len(list) == 0 {
+            return nil
+        }
+        b, _ := json.Marshal(list)
+        s := string(b)
+        return &s
+    }
+
 	futureDL := time.Now().Add(7 * 24 * time.Hour)  // 一周后
 	pastDL := time.Now().Add(-3 * 24 * time.Hour)   // 三天前
 	soonDL := time.Now().Add(2 * 24 * time.Hour)    // 两天后
 	
-	DB.Exec(`
-		INSERT INTO assignments (course_id, title, content, deadline) VALUES
-		(1, 'Go语言基础练习', '编写一个简单的Go程序，实现基本的输入输出功能。要求：1) 使用fmt包读取用户输入 2) 进行简单的计算 3) 输出结果', ?),
-		(1, 'Go并发编程作业', '使用Goroutine和Channel实现一个并发任务处理程序', ?),
-		(2, 'Python装饰器实战', '使用装饰器实现函数执行时间统计和日志记录功能', ?),
-		(2, 'Python数据处理', '使用Pandas处理CSV文件，完成数据清洗和分析', ?),
-		(3, 'React组件开发', '创建一个可复用的用户信息卡片组件，支持头像、姓名、简介显示', ?),
-		(3, 'React Hooks练习', '使用useState和useEffect实现一个计数器组件', ?),
-		(4, 'TypeScript类型系统', '定义复杂的TypeScript接口和类型，实现类型安全的数据结构', ?),
-		(5, 'HTML+CSS布局', '使用Flexbox和Grid实现响应式页面布局', ?),
-		(5, 'JavaScript DOM操作', '实现一个待办事项列表，支持增删改查', ?),
-		(6, '数据可视化作业', '使用Python绘制数据分析图表', ?)
-	`, pastDL, futureDL, pastDL, soonDL, pastDL, futureDL, soonDL, pastDL, futureDL, soonDL)
+    // 逐条插入，便于携带 Markdown 与附件 JSON
+    // 1) Go语言基础练习
+    content1 := "# Go语言基础练习\n\n**目标**：掌握输入/输出与基本计算。\n\n**要求**：\n- 使用 fmt 包读取用户输入\n- 完成一次加法/乘法计算\n- 输出格式化结果\n\n**示例**：\n```go\npackage main\nimport \"fmt\"\nfunc main(){\n\tfmt.Println(\"Hello Go\")\n}\n```\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        1, "Go语言基础练习", content1, pastDL, toJSON([]string{"/static/assignments/go-basics-spec.md", "/static/assignments/go-basics-starter.txt"}))
 
-	fmt.Println("  ✓ 作业创建完成 (10个作业)")
+    // 2) Go并发编程作业
+    content2 := "# Go 并发编程作业\n\n实现一个基于 Goroutine 与 Channel 的任务池。\n\n**验收标准**：\n1. 可配置并发数\n2. 正确关闭与资源回收\n3. 覆盖核心流程的单元测试\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        1, "Go并发编程作业", content2, futureDL, toJSON([]string{"/static/assignments/go-concurrency-spec.md"}))
+
+    // 3) Python装饰器实战
+    content3 := "# Python 装饰器实战\n\n- 统计函数耗时\n- 记录日志\n\n```python\nimport time\n```\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        2, "Python装饰器实战", content3, pastDL, nil)
+
+    // 4) Python数据处理
+    content4 := "# Python 数据处理\n\n- 清洗缺失值\n- 分组统计\n- 导出 CSV\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        2, "Python数据处理", content4, soonDL, toJSON([]string{"/static/assignments/python-data-sample.csv"}))
+
+    // 5) React组件开发
+    content5 := "# React 组件开发\n\n创建一个可复用的用户信息卡片组件：头像、姓名、简介。\n\n- Props 设计\n- 组件状态与样式\n- 单元测试\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        3, "React组件开发", content5, pastDL, toJSON([]string{"/static/assignments/react-usercard-design.md"}))
+
+    // 6) React Hooks练习
+    content6 := "# React Hooks 练习\n\n使用 useState 与 useEffect 实现计数器并处理订阅清理。\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        3, "React Hooks练习", content6, futureDL, nil)
+
+    // 7) TypeScript类型系统
+    content7 := "# TypeScript 类型系统\n\n- 接口与类型别名\n- 泛型函数\n- 条件类型\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        4, "TypeScript类型系统", content7, soonDL, nil)
+
+    // 8) HTML+CSS布局
+    content8 := "# HTML+CSS 布局\n\n- Flex 与 Grid\n- 响应式断点\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        5, "HTML+CSS布局", content8, pastDL, nil)
+
+    // 9) JavaScript DOM操作
+    content9 := "# JavaScript DOM 操作\n\n- CRUD 待办事项\n- 事件代理\n- 本地存储\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        5, "JavaScript DOM操作", content9, futureDL, nil)
+
+    // 10) 数据可视化作业
+    content10 := "# 数据可视化作业\n\n- 选择合适图表\n- 合理配色\n- 输出 PNG/PDF 报告\n"
+    DB.Exec(`INSERT INTO assignments (course_id, title, content, deadline, attachments) VALUES (?, ?, ?, ?, ?)`,
+        6, "数据可视化作业", content10, soonDL, nil)
+
+    fmt.Println("  ✓ 作业创建完成 (10个作业, 含 Markdown 与示例附件)")
 
 	// 8. 创建作业提交记录
 	DB.Exec(`

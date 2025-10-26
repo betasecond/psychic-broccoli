@@ -32,7 +32,12 @@ const UsersPage: React.FC = () => {
 
     setUploading(true);
     try {
-      const file = fileList[0].originFileObj;
+      const file = (fileList[0] && (fileList[0].originFileObj || fileList[0])) as File | undefined;
+      if (!file) {
+        message.error('未获取到文件，请重新选择');
+        setUploading(false);
+        return;
+      }
       const result = await userService.importUsersFromExcel(file);
       
       Modal.success({
@@ -72,20 +77,23 @@ const UsersPage: React.FC = () => {
   const uploadProps: UploadProps = {
     name: 'file',
     multiple: false,
-    accept: '.xlsx,.xls',
+    accept: '.xlsx',
     fileList,
     beforeUpload: (file) => {
-      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                      file.type === 'application/vnd.ms-excel' ||
-                      file.name.endsWith('.xlsx') ||
-                      file.name.endsWith('.xls');
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                      file.name.endsWith('.xlsx');
       
       if (!isExcel) {
         message.error('只能上传Excel文件！');
         return false;
       }
       
-      setFileList([file]);
+      setFileList([{
+        uid: file.uid,
+        name: file.name,
+        status: 'done',
+        originFileObj: file as any,
+      }]);
       return false; // 阻止自动上传
     },
     onRemove: () => {
@@ -690,16 +698,14 @@ const UsersPage: React.FC = () => {
                 <InboxOutlined />
               </p>
               <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-              <p className="ant-upload-hint">
-                支持 .xlsx 和 .xls 格式的Excel文件
-              </p>
+              <p className="ant-upload-hint">仅支持 .xlsx 格式的 Excel 文件</p>
             </Dragger>
           </div>
 
           <div style={{ padding: '12px', backgroundColor: '#f0f2f5', borderRadius: '4px' }}>
             <Text strong>导入说明：</Text>
             <ul style={{ marginTop: '8px', marginBottom: 0 }}>
-              <li>必填字段：用户名、密码、角色</li>
+              <li>必填字段：用户名、角色；密码留空将使用默认密码 jimei123</li>
               <li>角色可选值：STUDENT（学生）、INSTRUCTOR（教师）、ADMIN（管理员）</li>
               <li>可选字段：邮箱、头像URL</li>
               <li>用户名不能重复</li>

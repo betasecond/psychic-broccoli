@@ -6,6 +6,7 @@ export interface Assignment {
   courseId: number
   title: string
   content?: string
+  attachments?: string
   deadline?: string
   createdAt: string
   courseTitle?: string

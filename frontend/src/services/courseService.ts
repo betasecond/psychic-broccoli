@@ -67,9 +67,7 @@ export interface CourseResponse {
 
 export interface ChaptersResponse {
   success: boolean
-  data: {
-    chapters: CourseChapter[]
-  }
+  data: CourseChapter[] | { chapters: CourseChapter[] }
 }
 
 export interface StatisticsResponse {

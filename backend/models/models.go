@@ -71,6 +71,7 @@ type Assignment struct {
 	Title     string     `json:"title"`
 	Content   *string    `json:"content,omitempty"`
 	Deadline  *time.Time `json:"deadline,omitempty"`
+    Attachments *string  `json:"attachments,omitempty"`
 	CreatedAt time.Time  `json:"createdAt"`
 }
 

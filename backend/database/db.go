@@ -36,6 +36,11 @@ func InitDB(dbPath string) error {
 		return fmt.Errorf("无法创建数据库表: %v", err)
 	}
 
+    // 保障新增列存在（幂等）
+    if err := ensureAssignmentAttachmentsColumn(); err != nil {
+        return fmt.Errorf("数据库列校验失败: %v", err)
+    }
+
 	fmt.Println("✅ 数据库初始化成功")
 	return nil
 }
@@ -46,5 +51,35 @@ func CloseDB() error {
 		return DB.Close()
 	}
 	return nil
+}
+
+// ensureAssignmentAttachmentsColumn 确保 assignments 表存在 attachments 列（SQLite 不支持 IF NOT EXISTS 列级别，这里做运行时校验）
+func ensureAssignmentAttachmentsColumn() error {
+    rows, err := DB.Query("PRAGMA table_info(assignments)")
+    if err != nil {
+        return err
+    }
+    defer rows.Close()
+
+    has := false
+    for rows.Next() {
+        var cid int
+        var name, ctype string
+        var notnull, pk int
+        var dflt sql.NullString
+        if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+            return err
+        }
+        if name == "attachments" {
+            has = true
+            break
+        }
+    }
+    if !has {
+        if _, err := DB.Exec("ALTER TABLE assignments ADD COLUMN attachments TEXT"); err != nil {
+            return err
+        }
+    }
+    return nil
 }
 

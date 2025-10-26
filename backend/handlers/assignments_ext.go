@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+    "database/sql"
+    "encoding/json"
 
-	"github.com/gin-gonic/gin"
-	"github.com/online-education-platform/backend/database"
-	"github.com/online-education-platform/backend/utils"
+    "github.com/gin-gonic/gin"
+    "github.com/online-education-platform/backend/database"
+    "github.com/online-education-platform/backend/utils"
 )
 
 // GetAssignmentStatistics 获取作业统计信息
@@ -262,17 +263,35 @@ func UpdateAssignment(c *gin.Context) {
 		return
 	}
 
-	var req CreateAssignmentRequest
+    var req CreateAssignmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请求参数错误")
 		return
 	}
 
-	_, err = database.DB.Exec(`
-		UPDATE assignments 
-		SET title = ?, content = ?, deadline = ?
-		WHERE id = ?
-	`, req.Title, req.Content, req.Deadline, assignmentID)
+    // 解析 deadline
+    var deadline interface{}
+    if req.Deadline != nil && *req.Deadline != "" {
+        deadline = *req.Deadline
+    } else {
+        deadline = nil
+    }
+
+    // 处理附件 JSON
+    var attachmentsJSON interface{}
+    if req.Attachments != nil {
+        if b, err := json.Marshal(req.Attachments); err == nil {
+            attachmentsJSON = string(b)
+        }
+    } else {
+        attachmentsJSON = nil
+    }
+
+    _, err = database.DB.Exec(`
+        UPDATE assignments 
+        SET title = ?, content = ?, deadline = ?, attachments = ?
+        WHERE id = ?
+    `, req.Title, req.Content, deadline, attachmentsJSON, assignmentID)
 
 	if err != nil {
 		utils.InternalServerError(c, "更新失败")

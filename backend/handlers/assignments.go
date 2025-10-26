@@ -1,14 +1,15 @@
 package handlers
 
 import (
-	"database/sql"
-	"strconv"
-	"time"
+    "database/sql"
+    "encoding/json"
+    "strconv"
+    "time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/online-education-platform/backend/database"
-	"github.com/online-education-platform/backend/models"
-	"github.com/online-education-platform/backend/utils"
+    "github.com/gin-gonic/gin"
+    "github.com/online-education-platform/backend/database"
+    "github.com/online-education-platform/backend/models"
+    "github.com/online-education-platform/backend/utils"
 )
 
 // CreateAssignmentRequest 创建作业请求
@@ -17,6 +18,7 @@ type CreateAssignmentRequest struct {
 	Title    string  `json:"title" binding:"required"`
 	Content  *string `json:"content"`
 	Deadline *string `json:"deadline"` // ISO 8601格式
+    Attachments *[]string `json:"attachments"`
 }
 
 // SubmitAssignmentRequest 提交作业请求
@@ -39,11 +41,11 @@ func GetAssignments(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 
-	query := `
-		SELECT id, course_id, title, content, deadline, created_at
-		FROM assignments
-		WHERE 1=1
-	`
+    query := `
+        SELECT id, course_id, title, content, deadline, created_at, attachments
+        FROM assignments
+        WHERE 1=1
+    `
 	args := []interface{}{}
 
 	if courseID != "" {
@@ -65,10 +67,10 @@ func GetAssignments(c *gin.Context) {
 	for rows.Next() {
 		var assignment models.Assignment
 		var deadline sql.NullTime
-		err := rows.Scan(
-			&assignment.ID, &assignment.CourseID, &assignment.Title,
-			&assignment.Content, &deadline, &assignment.CreatedAt,
-		)
+        err := rows.Scan(
+            &assignment.ID, &assignment.CourseID, &assignment.Title,
+            &assignment.Content, &deadline, &assignment.CreatedAt, &assignment.Attachments,
+        )
 		if err != nil {
 			continue
 		}
@@ -117,7 +119,7 @@ func CreateAssignment(c *gin.Context) {
 	}
 
 	// 解析deadline
-	var deadline *time.Time
+    var deadline *time.Time
 	if req.Deadline != nil && *req.Deadline != "" {
 		t, err := time.Parse(time.RFC3339, *req.Deadline)
 		if err == nil {
@@ -125,10 +127,19 @@ func CreateAssignment(c *gin.Context) {
 		}
 	}
 
-	result, err := database.DB.Exec(`
-		INSERT INTO assignments (course_id, title, content, deadline)
-		VALUES (?, ?, ?, ?)
-	`, req.CourseID, req.Title, req.Content, deadline)
+    // 处理附件为 JSON 字符串
+    var attachmentsJSON *string
+    if req.Attachments != nil {
+        if b, err := json.Marshal(req.Attachments); err == nil {
+            s := string(b)
+            attachmentsJSON = &s
+        }
+    }
+
+    result, err := database.DB.Exec(`
+        INSERT INTO assignments (course_id, title, content, deadline, attachments)
+        VALUES (?, ?, ?, ?, ?)
+    `, req.CourseID, req.Title, req.Content, deadline, attachmentsJSON)
 
 	if err != nil {
 		utils.InternalServerError(c, "创建作业失败")
@@ -148,14 +159,14 @@ func GetAssignment(c *gin.Context) {
 
 	var assignment models.Assignment
 	var deadline sql.NullTime
-	err := database.DB.QueryRow(`
-		SELECT id, course_id, title, content, deadline, created_at
-		FROM assignments
-		WHERE id = ?
-	`, assignmentID).Scan(
-		&assignment.ID, &assignment.CourseID, &assignment.Title,
-		&assignment.Content, &deadline, &assignment.CreatedAt,
-	)
+    err := database.DB.QueryRow(`
+        SELECT id, course_id, title, content, deadline, created_at, attachments
+        FROM assignments
+        WHERE id = ?
+    `, assignmentID).Scan(
+        &assignment.ID, &assignment.CourseID, &assignment.Title,
+        &assignment.Content, &deadline, &assignment.CreatedAt, &assignment.Attachments,
+    )
 
 	if err == sql.ErrNoRows {
 		utils.NotFound(c, "作业不存在")

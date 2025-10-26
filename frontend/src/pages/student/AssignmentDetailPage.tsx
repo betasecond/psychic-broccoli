@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Button, Typography, Space, Form, Input, message, Spin, Tag, Divider } from 'antd';
 import { 
   FileTextOutlined, 
@@ -11,6 +11,9 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector, selectCurrentAssignment, selectAssignmentLoading } from '../../store';
 import { fetchAssignment, submitAssignment, clearCurrentAssignment } from '../../store/slices/assignmentSlice';
+// Markdown 渲染（需安装 react-markdown 与 remark-gfm）
+// import ReactMarkdown from 'react-markdown'
+// import remarkGfm from 'remark-gfm'
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -114,9 +117,9 @@ const AssignmentDetailPage: React.FC = () => {
 
               <div>
                 <Title level={4}>作业要求</Title>
-                <Paragraph>
-                  {assignment.content || '暂无作业说明'}
-                </Paragraph>
+                {/* 如果未安装Markdown依赖，先以纯文本展示；安装后可启用下方组件 */}
+                {/* <ReactMarkdown remarkPlugins={[remarkGfm]}>{assignment.content || '暂无作业说明'}</ReactMarkdown> */}
+                <Paragraph>{assignment.content || '暂无作业说明'}</Paragraph>
               </div>
 
               {assignment.deadline && (
@@ -127,6 +130,29 @@ const AssignmentDetailPage: React.FC = () => {
                     <Text>{new Date(assignment.deadline).toLocaleString('zh-CN')}</Text>
                   </Space>
                 </div>
+              )}
+
+              {assignment.attachments && (
+                <>
+                  <Divider />
+                  <div>
+                    <Title level={4}>附件</Title>
+                    <ul style={{ paddingLeft: 16 }}>
+                      {(() => {
+                        try {
+                          const list: string[] = JSON.parse(assignment.attachments || '[]')
+                          return list.length > 0 ? list.map((href, idx) => (
+                            <li key={idx}>
+                              <a href={href} target="_blank" rel="noreferrer">附件 {idx + 1}</a>
+                            </li>
+                          )) : <Text type="secondary">无附件</Text>
+                        } catch {
+                          return <Text type="secondary">附件格式错误</Text>
+                        }
+                      })()}
+                    </ul>
+                  </div>
+                </>
               )}
 
               {assignment.submitted && assignment.graded && (

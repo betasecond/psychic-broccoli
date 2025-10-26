@@ -1,14 +1,15 @@
 package handlers
 
 import (
-	"fmt"
-	"path/filepath"
+    "fmt"
+    "path/filepath"
+    "strings"
 
-	"github.com/gin-gonic/gin"
-	"github.com/online-education-platform/backend/database"
-	"github.com/online-education-platform/backend/utils"
-	"github.com/xuri/excelize/v2"
-	"golang.org/x/crypto/bcrypt"
+    "github.com/gin-gonic/gin"
+    "github.com/online-education-platform/backend/database"
+    "github.com/online-education-platform/backend/utils"
+    "github.com/xuri/excelize/v2"
+    "golang.org/x/crypto/bcrypt"
 )
 
 // ImportUsersFromExcel 从Excel批量导入用户
@@ -28,12 +29,12 @@ func ImportUsersFromExcel(c *gin.Context) {
 		return
 	}
 
-	// 检查文件扩展名
-	ext := filepath.Ext(file.Filename)
-	if ext != ".xlsx" && ext != ".xls" {
-		utils.BadRequest(c, "只支持Excel文件(.xlsx, .xls)")
-		return
-	}
+    // 检查文件扩展名（仅支持 .xlsx）
+    ext := filepath.Ext(file.Filename)
+    if ext != ".xlsx" {
+        utils.BadRequest(c, "只支持Excel文件(.xlsx)")
+        return
+    }
 
 	// 保存临时文件
 	tempPath := filepath.Join("database", "temp_upload.xlsx")
@@ -58,10 +59,10 @@ func ImportUsersFromExcel(c *gin.Context) {
 		return
 	}
 
-	if len(rows) < 2 {
-		utils.BadRequest(c, "Excel文件为空或格式错误")
-		return
-	}
+    if len(rows) < 2 {
+        utils.BadRequest(c, "Excel模板为空或仅包含表头，请至少填写一行数据后再上传")
+        return
+    }
 
 	// 解析并导入用户
 	successCount := 0
@@ -80,8 +81,8 @@ func ImportUsersFromExcel(c *gin.Context) {
 			continue
 		}
 
-		username := row[0]
-		password := row[1]
+        username := row[0]
+        password := row[1]
 		userRole := row[2]
 
 		// 验证角色
@@ -100,8 +101,13 @@ func ImportUsersFromExcel(c *gin.Context) {
 			continue
 		}
 
-		// 加密密码
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+        // 密码留空则设置默认密码
+        if strings.TrimSpace(password) == "" {
+            password = "jimei123"
+        }
+
+        // 加密密码
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("第%d行: 密码加密失败", i+1))
 			errorCount++
@@ -144,9 +150,9 @@ func ImportUsersFromExcel(c *gin.Context) {
 func DownloadUserTemplate(c *gin.Context) {
 	role, _ := c.Get("role")
 
-	// 只有管理员可以下载模板
-	if role != "ADMIN" {
-		utils.Forbidden(c, "只有管理员可以下载模板")
+    // 管理员与教师可以下载模板（导入仍仅限管理员）
+    if role != "ADMIN" && role != "INSTRUCTOR" {
+        utils.Forbidden(c, "只有管理员或教师可以下载模板")
 		return
 	}
 
@@ -162,8 +168,8 @@ func DownloadUserTemplate(c *gin.Context) {
 	// 设置列宽
 	f.SetColWidth(sheetName, "A", "E", 20)
 
-	// 设置表头
-	headers := []string{"用户名", "密码", "角色", "邮箱(可选)", "头像URL(可选)"}
+    // 设置表头
+    headers := []string{"用户名", "密码(留空=默认jimei123)", "角色", "邮箱(可选)", "头像URL(可选)"}
 	for i, header := range headers {
 		cell := string(rune('A'+i)) + "1"
 		f.SetCellValue(sheetName, cell, header)
@@ -186,16 +192,17 @@ func DownloadUserTemplate(c *gin.Context) {
 	// 添加说明sheet
 	instructionSheet := "使用说明"
 	f.NewSheet(instructionSheet)
-	instructions := []string{
-		"用户批量导入说明",
-		"",
-		"1. 必填字段：用户名、密码、角色",
-		"2. 角色只能是以下三种之一：STUDENT（学生）、INSTRUCTOR（教师）、ADMIN（管理员）",
-		"3. 邮箱和头像URL为可选字段",
-		"4. 用户名不能重复",
-		"5. 请按照模板格式填写，不要修改表头",
-		"6. 填写完成后，在系统中上传此Excel文件即可",
-	}
+    instructions := []string{
+        "用户批量导入说明",
+        "",
+        "1. 必填字段：用户名、角色；密码列可留空，留空将使用默认密码 jimei123",
+        "2. 角色只能是以下三种之一：STUDENT（学生）、INSTRUCTOR（教师）、ADMIN（管理员）",
+        "3. 邮箱和头像URL为可选字段",
+        "4. 仅支持 .xlsx 文件格式，请勿使用 .xls",
+        "5. 用户名不能重复",
+        "6. 请按照模板格式填写，不要修改表头",
+        "7. 填写完成后，在系统中上传此Excel文件即可",
+    }
 
 	for i, instruction := range instructions {
 		cell := "A" + fmt.Sprintf("%d", i+1)

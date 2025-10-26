@@ -13,7 +13,9 @@ import {
   ProfilePage,
   // Student pages
   AssignmentsPage,
+  AssignmentDetailPage,
   CoursesPage,
+  CourseDetailPage,
   ExamsPage,
   LiveClassesPage,
   SchedulePage,
@@ -104,10 +106,26 @@ function App() {
                 }
               />
               <Route
+                path="/student/courses/:id"
+                element={
+                  <AppLayout>
+                    <CourseDetailPage />
+                  </AppLayout>
+                }
+              />
+              <Route
                 path="/student/assignments"
                 element={
                   <AppLayout>
                     <AssignmentsPage />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="/student/assignments/:id"
+                element={
+                  <AppLayout>
+                    <AssignmentDetailPage />
                   </AppLayout>
                 }
               />
