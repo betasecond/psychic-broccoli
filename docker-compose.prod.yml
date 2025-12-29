@@ -74,7 +74,7 @@ services:
   # Watchtower - Auto-update containers when new images are pushed
   # ==========================================================
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.7.1
     container_name: courseark-watchtower
     restart: unless-stopped
     environment:
