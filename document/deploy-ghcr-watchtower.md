@@ -287,10 +287,13 @@ docker start courseark-watchtower
 docker compose -f docker-compose.prod.yml logs backend
 
 # 常见原因：
-# 1. JWT_SECRET 未设置 → 检查 .env 文件
-# 2. 端口被占用 → netstat -tlnp | grep 80
-# 3. 镜像拉取失败 → docker login ghcr.io
+# 1. GHCR_OWNER 未设置 → 检查 .env 文件（必填！）
+# 2. JWT_SECRET 未设置 → 检查 .env 文件（必填！）
+# 3. 端口被占用 → netstat -tlnp | grep 80
+# 4. 镜像拉取失败 → docker login ghcr.io
 ```
+
+**注意**：`GHCR_OWNER` 和 `JWT_SECRET` 是必填项。如果未设置，docker compose 会直接报错并拒绝启动，避免使用错误的默认值。
 
 ### 问题：Watchtower 不更新
 
@@ -303,7 +306,14 @@ docker inspect courseark-backend | grep watchtower
 
 # 手动触发检查
 docker exec courseark-watchtower /watchtower --run-once
+
+# 检查 Docker 配置文件是否正确挂载
+docker exec courseark-watchtower cat /config.json
 ```
+
+**常见原因**：
+- Docker 配置路径不对：如果你不是 root 用户，需要在 `.env` 中设置 `DOCKER_CONFIG_PATH=/home/<用户名>/.docker/config.json`
+- 未登录 GHCR：需要先在宿主机执行 `docker login ghcr.io`
 
 ### 问题：无法访问网站
 
@@ -335,19 +345,46 @@ docker cp ./backup.db courseark-backend:/data/education.db
 docker restart courseark-backend
 ```
 
+### 问题：上传的附件丢失
+
+用户上传的附件保存在 `uploads_data` volume 中：
+
+```bash
+# 查看 uploads volume
+docker volume inspect courseark_uploads_data
+
+# 备份上传文件
+docker cp courseark-backend:/app/public/uploads ./uploads-backup
+
+# 恢复上传文件
+docker cp ./uploads-backup/. courseark-backend:/app/public/uploads/
+docker restart courseark-backend
+```
+
+**数据持久化说明**：
+- `sqlite_data` volume → `/data/education.db`（数据库）
+- `uploads_data` volume → `/app/public/uploads`（用户上传的附件）
+
+两个 volume 都会在容器重启、镜像更新时保留数据。
+
 ---
 
 ## 附录：环境变量说明
 
+### 必填变量（启动前必须设置）
+
+| 变量 | 说明 |
+|------|------|
+| `GHCR_OWNER` | GitHub 用户名，用于拉取镜像。未设置时启动会报错。 |
+| `JWT_SECRET` | JWT 签名密钥。建议使用 `openssl rand -base64 32` 生成。未设置时启动会报错。 |
+
+### 可选变量
+
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `GHCR_OWNER` | GitHub 用户名，用于拉取镜像 | `local` |
-| `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
 | `WEB_PORT` | Web 服务对外端口 | `80` |
 | `ENABLE_SEED` | 是否填充测试数据（生产环境建议禁用） | `false` |
-| `SERVER_PORT` | 后端 API 端口（内部） | `8080` |
-| `DB_PATH` | SQLite 数据库路径 | `/data/education.db` |
-| `GIN_MODE` | Gin 运行模式 | `release` |
+| `DOCKER_CONFIG_PATH` | Docker 配置文件路径（Watchtower 用于 GHCR 认证） | `/root/.docker/config.json` |
 | `SERVER_PORT` | 后端 API 端口（内部） | `8080` |
 | `DB_PATH` | SQLite 数据库路径 | `/data/education.db` |
 | `GIN_MODE` | Gin 运行模式 | `release` |

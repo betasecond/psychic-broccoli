@@ -160,22 +160,26 @@ server {
 ```yaml
 services:
   backend:
-    image: ghcr.io/${GHCR_OWNER}/psychic-broccoli-backend:latest
+    # 注意: GHCR_OWNER 是必填项，未设置会报错
+    image: "ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/psychic-broccoli-backend:latest"
     container_name: courseark-backend
     restart: unless-stopped
     environment:
       - SERVER_PORT=8080
       - DB_PATH=/data/education.db
-      - JWT_SECRET=${JWT_SECRET}
+      - "JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}"
+      - GIN_MODE=release
+      - ENABLE_SEED=${ENABLE_SEED:-false}
     volumes:
       - sqlite_data:/data
+      - uploads_data:/app/public/uploads  # 用户上传的附件
     networks:
       - courseark-network
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   web:
-    image: ghcr.io/${GHCR_OWNER}/psychic-broccoli-web:latest
+    image: "ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/psychic-broccoli-web:latest"
     container_name: courseark-web
     restart: unless-stopped
     ports:
@@ -198,24 +202,34 @@ services:
       - WATCHTOWER_CLEANUP=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config.json:ro
+      # 使用绝对路径，非 root 用户需设置 DOCKER_CONFIG_PATH
+      - ${DOCKER_CONFIG_PATH:-/root/.docker/config.json}:/config.json:ro
 
 networks:
   courseark-network:
     driver: bridge
 
 volumes:
-  sqlite_data:
+  sqlite_data:      # SQLite 数据库
+  uploads_data:     # 用户上传的附件
 ```
 
 ## 6. 环境变量
 
+### 必填变量
+
+| 变量 | 说明 |
+|------|------|
+| `GHCR_OWNER` | GitHub 用户名，用于拉取镜像。**必填**，未设置时启动报错。 |
+| `JWT_SECRET` | JWT 签名密钥。**必填**，建议用 `openssl rand -base64 32` 生成。 |
+
+### 可选变量
+
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `GHCR_OWNER` | GitHub 用户名 | `local` |
-| `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
 | `WEB_PORT` | Web 服务端口 | `80` |
 | `ENABLE_SEED` | 是否填充测试数据（生产环境建议禁用） | `false` |
+| `DOCKER_CONFIG_PATH` | Docker 配置文件路径（Watchtower 认证用） | `/root/.docker/config.json` |
 | `SERVER_PORT` | 后端 API 端口 | `8080` |
 | `DB_PATH` | SQLite 路径 | `/data/education.db` |
 | `GIN_MODE` | Gin 运行模式 | `release` |

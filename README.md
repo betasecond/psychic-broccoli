@@ -96,13 +96,16 @@ git push main → GitHub Actions 构建镜像 → 推送 GHCR → Watchtower 自
    # 下载 compose 文件
    curl -O https://raw.githubusercontent.com/<你的用户名>/psychic-broccoli/main/docker-compose.prod.yml
    
-   # 创建 .env 文件
+   # 创建 .env 文件（GHCR_OWNER 和 JWT_SECRET 是必填项！）
    cat > .env << EOF
    GHCR_OWNER=你的GitHub用户名
    JWT_SECRET=$(openssl rand -base64 32)
    WEB_PORT=80
+   ENABLE_SEED=false
    EOF
    ```
+   
+   > ⚠️ **重要**：`GHCR_OWNER` 和 `JWT_SECRET` 是必填项，未设置会导致启动失败。
 
 3. **启动服务**：
    ```bash
