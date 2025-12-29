@@ -1,235 +1,259 @@
-# **Docker & Docker Compose 配置约定**
+# Docker & Docker Compose 配置约定
 
-版本: 1.0  
-目标: 为在线教育平台项目定义一套标准的容器化构建、部署和管理流程。
+版本: 2.0  
+更新: 适配 Go (Gin) + React (Vite) 技术栈  
+目标: 为 CourseArk 在线教育平台项目定义一套标准的容器化构建、部署和管理流程。
 
-## **1\. 概述**
+## 1. 概述
 
 本文档旨在统一项目团队在使用 Docker 和 Docker Compose 时的配置、命令和最佳实践。通过容器化，我们可以实现：
 
-* **环境一致性:** 消除“在我电脑上能跑”的问题。  
-* **快速部署:** 通过一条命令即可启动整个应用栈。  
-* **服务隔离:** 各个服务（前端、后端、数据库）在独立的环境中运行，互不干扰。  
-* **平滑扩展:** 便于未来对单个服务进行水平扩展。
+* **环境一致性:** 消除"在我电脑上能跑"的问题。
+* **快速部署:** 通过一条命令即可启动整个应用栈。
+* **服务隔离:** 各个服务（前端、后端、数据库）在独立的环境中运行，互不干扰。
+* **自动更新:** 配合 Watchtower 实现推送代码即自动部署。
 
-## **2\. 推荐项目目录结构**
+## 2. 技术栈
 
-一个清晰的目录结构是高效协作的基础。
+| 组件 | 技术 | 说明 |
+|------|------|------|
+| 后端 | Go 1.24 + Gin | RESTful API 服务 |
+| 数据库 | SQLite | 嵌入式数据库，通过 Docker Volume 持久化 |
+| 前端 | React 19 + Vite | SPA 单页应用 |
+| Web 服务器 | Nginx | 托管前端静态资源 + 反向代理 API |
+| 自动更新 | Watchtower | 自动拉取新镜像并重启容器 |
 
-online-education-platform/  
-├── backend/                  \# 后端 Spring Boot 项目  
-│   ├── src/  
-│   ├── pom.xml  
-│   └── Dockerfile            \# 后端 Dockerfile  
-│  
-├── frontend/                 \# 前端 React 项目  
-│   ├── src/  
-│   ├── package.json  
-│   └── Dockerfile            \# 前端 Dockerfile  
-│  
-├── .env                      \# 环境变量文件 (不提交到 Git)  
-├── docker-compose.yml        \# Docker Compose 编排文件  
-└── nginx.conf                \# Nginx 配置文件 (与 docker-compose.yml 同级)
+## 3. 项目目录结构
 
-## **3\. Dockerfile 最佳实践**
+```
+psychic-broccoli/
+├── backend/
+│   ├── Dockerfile           # 后端多阶段构建
+│   ├── .dockerignore        # 构建时排除的文件
+│   ├── main.go
+│   ├── go.mod
+│   ├── database/
+│   │   └── schema.sql       # 数据库 Schema
+│   └── public/              # 静态资源（作业附件等）
+│
+├── frontend/
+│   ├── Dockerfile           # 前端多阶段构建
+│   ├── .dockerignore        # 构建时排除的文件
+│   ├── nginx.conf           # Nginx 配置
+│   ├── package.json
+│   └── src/
+│
+├── docker-compose.prod.yml  # 生产环境编排文件
+├── env.example              # 环境变量示例
+└── document/
+    └── deploy-ghcr-watchtower.md  # 详细部署指南
+```
 
-为了构建体积小、安全性高且高效的镜像，我们采用多阶段构建（Multi-stage builds）。
+## 4. Dockerfile 详解
 
-### **3.1. 后端 Dockerfile (backend/Dockerfile)**
+### 4.1. 后端 Dockerfile (`backend/Dockerfile`)
 
-此文件用于将 Spring Boot 应用打包成一个优化的 Docker 镜像。
+多阶段构建，生成静态链接的 Go 二进制文件：
 
-\# \--- Stage 1: Build a JAR file \---  
-\# 使用一个包含 Maven 和 JDK 的基础镜像  
-FROM maven:3.8.5-openjdk-17 AS builder
-
-\# 设置工作目录  
+```dockerfile
+# --- Stage 1: Build ---
+FROM golang:1.24-alpine AS builder
+RUN apk add --no-cache gcc musl-dev sqlite-dev
 WORKDIR /app
-
-\# 复制 pom.xml 并下载依赖, 充分利用 Docker 缓存  
-COPY pom.xml .  
-RUN mvn dependency:go-offline
-
-\# 复制源代码并构建应用  
-COPY src ./src  
-RUN mvn package \-DskipTests
-
-\# \--- Stage 2: Create a slim final image \---  
-\# 使用一个仅包含 JRE 的轻量级镜像  
-FROM eclipse-temurin:17-jre-focal
-
-\# 设置工作目录  
-WORKDIR /app
-
-\# 从 builder 阶段复制构建好的 JAR 文件  
-COPY \--from=builder /app/target/\*.jar app.jar
-
-\# 暴露后端服务端口  
-EXPOSE 35001
-
-\# 容器启动时运行 JAR 文件  
-ENTRYPOINT \["java", "-jar", "app.jar"\]
-
-### **3.2. 前端 Dockerfile (frontend/Dockerfile)**
-
-此文件用于构建前端 React 应用的静态文件，并使用 Nginx 来提供服务，这是生产环境的最佳实践。
-
-\# \--- Stage 1: Build static assets \---  
-\# 使用一个 Node.js 镜像来构建项目  
-FROM node:18-alpine AS builder
-
-\# 设置工作目录  
-WORKDIR /app
-
-\# 复制 package.json 和 lock 文件  
-COPY package\*.json ./
-
-\# 安装依赖  
-RUN npm install
-
-\# 复制源代码  
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s -linkmode external -extldflags '-static'" \
+    -o server main.go
 
-\# 构建生产环境的静态文件  
+# --- Stage 2: Runtime ---
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=builder /app/server .
+COPY --from=builder /app/database/schema.sql ./database/
+COPY --from=builder /app/public ./public
+RUN mkdir -p /data
+
+ENV SERVER_PORT=8080
+ENV DB_PATH=/data/education.db
+ENV JWT_SECRET=change-me-in-production
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+CMD ["./server"]
+```
+
+**关键点**：
+- 使用 Alpine 基础镜像，最终镜像约 20MB
+- CGO 启用（SQLite 需要）
+- 数据库文件放在 `/data` 目录，通过 Volume 持久化
+- 内置健康检查
+
+### 4.2. 前端 Dockerfile (`frontend/Dockerfile`)
+
+```dockerfile
+# --- Stage 1: Build ---
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
 RUN npm run build
 
-\# \--- Stage 2: Serve with Nginx \---  
-\# 使用一个轻量级的 Nginx 镜像  
-FROM nginx:1.23-alpine
-
-\# 从 builder 阶段复制构建好的静态文件到 Nginx 的默认 Web 根目录  
-COPY \--from=builder /app/build /usr/share/nginx/html
-
-\# (可选) 如果你的 React Router 使用了 BrowserRouter, 你需要一个 Nginx 配置来处理前端路由  
-\# COPY nginx.conf /etc/nginx/conf.d/default.conf  
-\# 这个 nginx.conf 是专门为前端服务准备的，不是项目根目录下的那个  
-\# 它的作用是将所有非静态文件的请求都指向 index.html  
-\#  
-\# 示例 \`frontend/nginx.conf\`:  
-\# server {  
-\#   listen 80;  
-\#   location / {  
-\#     root   /usr/share/nginx/html;  
-\#     index  index.html index.htm;  
-\#     try\_files $uri $uri/ /index.html;  
-\#   }  
-\# }
-
-\# 暴露端口  
+# --- Stage 2: Runtime ---
+FROM nginx:1.27-alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
-\# 启动 Nginx  
-CMD \["nginx", "-g", "daemon off;"\]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
-**注意:** 此 Dockerfile 用于生产部署。在开发阶段，前端服务通常是在本地通过 npm run dev 运行，并利用 docker-compose.yml 的 volumes 挂载代码以实现热更新。
+CMD ["nginx", "-g", "daemon off;"]
+```
 
-## **4\. Docker Compose 配置详解 (docker-compose.yml)**
+### 4.3. Nginx 配置 (`frontend/nginx.conf`)
 
-此文件是整个容器化应用的“总指挥”，定义和关联所有服务。
+```nginx
+upstream backend {
+    server backend:8080;
+}
 
-\# Docker Compose 文件版本  
-version: '3.8'
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    client_max_body_size 20M;
 
-\# 定义所有服务 (容器)  
-services:  
-  \# 后端 Spring Boot 服务  
-  backend:  
-    container\_name: online-edu-backend  
-    build:  
-      context: ./backend \# 指定 Dockerfile 所在目录  
-    restart: always  
-    environment:  
-      \# 通过 .env 文件注入数据库连接信息  
-      \- SPRING\_DATASOURCE\_URL=jdbc:postgresql://postgres:5432/${POSTGRES\_DB}  
-      \- SPRING\_DATASOURCE\_USERNAME=${POSTGRES\_USER}  
-      \- SPRING\_DATASOURCE\_PASSWORD=${POSTGRES\_PASSWORD}  
-    networks:  
-      \- app-network  
-    depends\_on:  
-      \- postgres \# 确保后端在数据库启动之后再启动
+    # API 反向代理
+    location /api/v1/ {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 
-  \# 前端 React 服务 (生产模式)  
-  frontend:  
-    container\_name: online-edu-frontend  
-    build:  
-      context: ./frontend  
-    restart: always  
-    networks:  
-      \- app-network
+    # 后端静态资源代理
+    location /static/ {
+        proxy_pass http://backend;
+    }
 
-  \# PostgreSQL 数据库服务  
-  postgres:  
-    container\_name: online-edu-db  
-    image: postgres:14-alpine  
-    restart: always  
-    environment:  
-      \# 从 .env 文件读取数据库的用户名、密码和库名  
-      \- POSTGRES\_USER=${POSTGRES\_USER}  
-      \- POSTGRES\_PASSWORD=${POSTGRES\_PASSWORD}  
-      \- POSTGRES\_DB=${POSTGRES\_DB}  
-    volumes:  
-      \# 将数据库数据持久化到宿主机，防止容器删除后数据丢失  
-      \- postgres\_data:/var/lib/postgresql/data  
-    networks:  
-      \- app-network  
-    ports:  
-      \# (可选) 暴露 5432 端口到宿主机，方便使用数据库工具连接  
-      \- "5432:5432"
+    # 健康检查代理
+    location /health {
+        proxy_pass http://backend;
+    }
 
-  \# Nginx 反向代理服务  
-  nginx:  
-    container\_name: online-edu-nginx  
-    image: nginx:latest  
-    restart: always  
-    ports:  
-      \# 应用的唯一入口  
-      \- "35000:35000"  
-    volumes:  
-      \# 将宿主机的 nginx.conf 文件挂载到容器中  
-      \- ./nginx.conf:/etc/nginx/conf.d/default.conf  
-    networks:  
-      \- app-network  
-    depends\_on:  
-      \- backend  
-      \- frontend
+    # SPA 路由
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
 
-\# 定义 Docker 网络  
-networks:  
-  app-network:  
+## 5. Docker Compose 配置
+
+### 5.1. 生产环境 (`docker-compose.prod.yml`)
+
+```yaml
+services:
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/psychic-broccoli-backend:latest
+    container_name: courseark-backend
+    restart: unless-stopped
+    environment:
+      - SERVER_PORT=8080
+      - DB_PATH=/data/education.db
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - sqlite_data:/data
+    networks:
+      - courseark-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  web:
+    image: ghcr.io/${GHCR_OWNER}/psychic-broccoli-web:latest
+    container_name: courseark-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    networks:
+      - courseark-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: courseark-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_CLEANUP=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
+
+networks:
+  courseark-network:
     driver: bridge
 
-\# 定义数据卷  
-volumes:  
-  postgres\_data:
+volumes:
+  sqlite_data:
+```
 
-## **5\. 环境变量管理 (.env 文件)**
+## 6. 环境变量
 
-在项目根目录创建一个 .env 文件来存储敏感信息和配置。**此文件不应提交到版本控制系统 (Git)**。
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `GHCR_OWNER` | GitHub 用户名 | `local` |
+| `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
+| `WEB_PORT` | Web 服务端口 | `80` |
+| `SERVER_PORT` | 后端 API 端口 | `8080` |
+| `DB_PATH` | SQLite 路径 | `/data/education.db` |
 
-\# .env file
+## 7. 常用命令
 
-\# PostgreSQL Database Configuration  
-POSTGRES\_USER=myuser  
-POSTGRES\_PASSWORD=mypassword  
-POSTGRES\_DB=online\_edu\_db
+```bash
+# 启动所有服务
+docker compose -f docker-compose.prod.yml up -d
 
-\# JWT Secret Key (Example)  
-JWT\_SECRET=your-super-secret-key-that-is-long-and-random
+# 查看状态
+docker compose -f docker-compose.prod.yml ps
 
-## **6\. 运行与管理**
+# 查看日志
+docker compose -f docker-compose.prod.yml logs -f
 
-* **首次启动或重建镜像:**  
-  docker-compose up \--build \-d
+# 手动更新
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 
-  (-d 表示在后台运行)  
-* **启动已构建的应用:**  
-  docker-compose up \-d
+# 停止服务
+docker compose -f docker-compose.prod.yml down
 
-* **停止应用:**  
-  docker-compose down
+# 备份数据库
+docker cp courseark-backend:/data/education.db ./backup.db
+```
 
-* **查看所有服务的日志:**  
-  docker-compose logs \-f
+## 8. CI/CD 集成
 
-* **查看特定服务的日志:**  
-  docker-compose logs \-f backend  
+项目使用 GitHub Actions 自动构建镜像：
+
+1. 推送到 `main` 分支
+2. GitHub Actions 构建 `backend` 和 `web` 镜像
+3. 推送到 GHCR（GitHub Container Registry）
+4. 远程服务器的 Watchtower 自动拉取更新
+
+详见：[`.github/workflows/publish-images.yml`](../.github/workflows/publish-images.yml)
+
+## 9. 参考文档
+
+- [完整部署指南](deploy-ghcr-watchtower.md)
+- [Watchtower 官方文档](https://containrrr.dev/watchtower/)
+- [Docker Compose 官方文档](https://docs.docker.com/compose/)

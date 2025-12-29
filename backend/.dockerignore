@@ -1,0 +1,38 @@
+# Docker build context exclusions for backend
+
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+
+# Test files
+*_test.go
+
+# Database files (will be mounted as volume)
+database/*.db
+database/temp_upload.xlsx
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!database/schema.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PowerShell scripts (Windows only)
+*.ps1

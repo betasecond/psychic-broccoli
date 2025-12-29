@@ -1,0 +1,38 @@
+# Docker build context exclusions for frontend
+
+# Dependencies (will be installed fresh in container)
+node_modules/
+
+# Build output (will be generated in container)
+dist/
+
+# Development files
+.env
+.env.local
+.env.development
+.env.development.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Test files and coverage
+coverage/
+*.test.ts
+*.test.tsx
+__tests__/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!nginx.conf
