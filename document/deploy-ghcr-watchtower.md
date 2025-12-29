@@ -140,6 +140,9 @@ JWT_SECRET=请替换为你的安全密钥-至少32个字符
 
 # Web 服务端口（默认 80）
 WEB_PORT=80
+
+# 是否填充测试数据（生产环境建议 false，开发环境可设 true）
+ENABLE_SEED=false
 EOF
 ```
 
@@ -164,6 +167,20 @@ docker compose -f docker-compose.prod.yml logs -f
 ```
 
 访问 `http://你的服务器IP` 应该能看到 CourseArk 前端界面。
+
+### 关于测试数据
+
+默认情况下，`ENABLE_SEED=false`，不会填充测试账号。如果你需要测试账号来验证功能，可以：
+
+```bash
+# 编辑 .env 文件
+echo "ENABLE_SEED=true" >> .env
+
+# 重新启动服务
+docker compose -f docker-compose.prod.yml up -d
+```
+
+**⚠️ 重要**：生产环境建议保持 `ENABLE_SEED=false`，避免初始化时创建测试用户账号。
 
 ---
 
@@ -327,6 +344,10 @@ docker restart courseark-backend
 | `GHCR_OWNER` | GitHub 用户名，用于拉取镜像 | `local` |
 | `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
 | `WEB_PORT` | Web 服务对外端口 | `80` |
+| `ENABLE_SEED` | 是否填充测试数据（生产环境建议禁用） | `false` |
+| `SERVER_PORT` | 后端 API 端口（内部） | `8080` |
+| `DB_PATH` | SQLite 数据库路径 | `/data/education.db` |
+| `GIN_MODE` | Gin 运行模式 | `release` |
 | `SERVER_PORT` | 后端 API 端口（内部） | `8080` |
 | `DB_PATH` | SQLite 数据库路径 | `/data/education.db` |
 | `GIN_MODE` | Gin 运行模式 | `release` |

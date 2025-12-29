@@ -215,8 +215,10 @@ volumes:
 | `GHCR_OWNER` | GitHub 用户名 | `local` |
 | `JWT_SECRET` | JWT 签名密钥 | `change-me-in-production` |
 | `WEB_PORT` | Web 服务端口 | `80` |
+| `ENABLE_SEED` | 是否填充测试数据（生产环境建议禁用） | `false` |
 | `SERVER_PORT` | 后端 API 端口 | `8080` |
 | `DB_PATH` | SQLite 路径 | `/data/education.db` |
+| `GIN_MODE` | Gin 运行模式 | `release` |
 
 ## 7. 常用命令
 

@@ -25,9 +25,13 @@ func main() {
 	}
 	defer database.CloseDB()
 
-	// 填充测试数据
-	if err := database.SeedData(); err != nil {
-		log.Printf("填充测试数据失败: %v", err)
+	// 填充测试数据（可通过 ENABLE_SEED 环境变量控制）
+	if cfg.EnableSeed {
+		if err := database.SeedData(); err != nil {
+			log.Printf("填充测试数据失败: %v", err)
+		}
+	} else {
+		fmt.Println("ℹ️  测试数据填充已禁用 (ENABLE_SEED=false)")
 	}
 
 	// 设置Gin模式

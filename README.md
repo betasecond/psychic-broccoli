@@ -42,6 +42,7 @@ go build -o server main.go
 - `SERVER_PORT`: 服务端口（默认 8080）
 - `DB_PATH`: SQLite 数据库路径（默认 `./database/education.db`）
 - `JWT_SECRET`: JWT 签名密钥
+- `ENABLE_SEED`: 是否填充测试数据（默认 false，生产环境建议禁用）
 
 #### 前端
 
