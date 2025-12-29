@@ -1,0 +1,63 @@
+# ============================================================
+# Backend Dockerfile - Go (Gin) + SQLite (cgo)
+# Multi-stage build for minimal production image
+# ============================================================
+
+# --- Stage 1: Build the Go binary ---
+FROM golang:1.24-alpine AS builder
+
+# Install build dependencies for CGO (SQLite requires CGO)
+RUN apk add --no-cache gcc musl-dev sqlite-dev
+
+WORKDIR /app
+
+# Copy go mod files first (for better layer caching)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build with CGO enabled for SQLite support
+# Use static linking for alpine compatibility
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s -linkmode external -extldflags '-static'" \
+    -o server main.go
+
+# --- Stage 2: Production runtime image ---
+FROM alpine:3.20
+
+# Install ca-certificates for HTTPS and timezone data
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy the compiled binary from builder
+COPY --from=builder /app/server .
+
+# Copy database schema (needed for InitDB to read schema.sql)
+COPY --from=builder /app/database/schema.sql ./database/
+
+# Copy public static files (assignments attachments, etc.)
+COPY --from=builder /app/public ./public
+
+# Create data directory for SQLite persistence
+# Create uploads directory for user-uploaded files (will be mounted as volume)
+RUN mkdir -p /data /app/public/uploads
+
+# Environment variables with defaults
+ENV SERVER_PORT=8080
+ENV DB_PATH=/data/education.db
+ENV JWT_SECRET=change-me-in-production
+ENV GIN_MODE=release
+
+# Expose the API port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Run the server
+CMD ["./server"]
+

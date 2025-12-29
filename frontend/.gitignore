@@ -45,10 +45,9 @@ coverage/
 *.zip
 *.rar
 
-# Docker
-Dockerfile
-docker-compose*.yml
-nginx.conf
+# Docker (keep Dockerfile and nginx.conf tracked for production)
+docker-compose.yml
+docker-compose.override.yml
 
 # OS generated files
 Thumbs.db

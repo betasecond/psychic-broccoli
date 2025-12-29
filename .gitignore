@@ -34,13 +34,10 @@ backend/out/
 *.rar
 *.7z
 
-# Docker
-docker-compose*.yml
+# Docker (keep docker-compose.prod.yml and Dockerfiles tracked)
+docker-compose.yml
+docker-compose.override.yml
 *.dockerfile
-Dockerfile
-backend/Dockerfile
-frontend/Dockerfile
-nginx.conf
 
 # Testing
 coverage/
