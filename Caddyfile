@@ -1,0 +1,3 @@
+courseark.online {
+    reverse_proxy web:80
+}

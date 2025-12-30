@@ -8,7 +8,14 @@ import (
 // CORSMiddleware 跨域中间件
 func CORSMiddleware() gin.HandlerFunc {
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:35002", "http://localhost:35000", "http://localhost:3000", "http://localhost:5173"}
+	config.AllowOrigins = []string{
+		"http://localhost:35002",
+		"http://localhost:35000",
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"https://courseark.online",
+		"http://courseark.online",
+	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Request-ID"}
 	config.ExposeHeaders = []string{"Content-Length"}
