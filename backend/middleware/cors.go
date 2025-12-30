@@ -15,6 +15,8 @@ func CORSMiddleware() gin.HandlerFunc {
 		"http://localhost:5173",
 		"https://courseark.online",
 		"http://courseark.online",
+		"https://web.courseark.online",
+		"http://web.courseark.online",
 	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Request-ID"}

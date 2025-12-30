@@ -1,3 +1,3 @@
-courseark.online {
+web.courseark.online {
     reverse_proxy web:80
 }
