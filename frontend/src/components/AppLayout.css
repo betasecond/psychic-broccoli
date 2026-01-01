@@ -91,3 +91,12 @@
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
+.app-footer {
+  text-align: center;
+  background: #f0f2f5;
+  color: #666;
+  padding: 16px 24px;
+  font-size: 14px;
+  border-top: 1px solid #e8e8e8;
+}

@@ -4,7 +4,7 @@ import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { UserAvatar, RoleBasedNavigation } from './index'
 import './AppLayout.css'
 
-const { Header, Content, Sider } = Layout
+const { Header, Content, Sider, Footer } = Layout
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -50,6 +50,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <Content className="app-content">
           {children}
         </Content>
+        <Footer className="app-footer">
+          © {new Date().getFullYear()} 在线教育平台 | 作者: wzh
+        </Footer>
       </Layout>
     </Layout>
   )
