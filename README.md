@@ -6,7 +6,7 @@
 
 - **前端**: React 19 + Vite + TypeScript + Ant Design + Redux Toolkit
 - **后端**: Go 1.24 + Gin + SQLite + JWT
-- **部署**: Docker + Docker Compose + Watchtower（自动更新）
+- **部署**: Docker + Docker Compose + Watchtower
 
 ## 项目结构
 
