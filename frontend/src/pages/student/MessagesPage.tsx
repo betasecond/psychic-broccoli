@@ -1,13 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Row, Col, Button, Typography, Space, List, Tabs, Badge, Avatar } from 'antd';
 import { MessageOutlined, BellOutlined, MailOutlined, CommentOutlined, LikeOutlined, UserAddOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
+interface Message {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  type: string;
+  status: 'read' | 'unread';
+  sender: string;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  type: string;
+}
+
+interface Discussion {
+  id: string;
+  title: string;
+  course: string;
+  author: string;
+  replies: number;
+  lastReply: string;
+  status: string;
+}
+
 const MessagesPage: React.FC = () => {
   // 模拟消息数据
-  const messages = [
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       title: '课程提醒：React 深入浅出 直播课即将开始',
@@ -44,9 +72,9 @@ const MessagesPage: React.FC = () => {
       status: 'read',
       sender: '平台公告'
     },
-  ];
+  ]);
 
-  const notifications = [
+  const notifications: Notification[] = [
     {
       id: 'n1',
       title: '课程进度提醒',
@@ -70,7 +98,7 @@ const MessagesPage: React.FC = () => {
     },
   ];
 
-  const discussions = [
+  const discussions: Discussion[] = [
     {
       id: 'd1',
       title: 'React Hooks 最佳实践',
@@ -100,6 +128,22 @@ const MessagesPage: React.FC = () => {
     },
   ];
 
+  // 标记已读/未读
+  const handleMarkAsRead = (id: string) => {
+    setMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg.id === id 
+          ? { ...msg, status: msg.status === 'read' ? 'unread' : 'read' }
+          : msg
+      )
+    );
+  };
+
+  // 删除消息
+  const handleDeleteMessage = (id: string) => {
+    setMessages(prevMessages => prevMessages.filter(msg => msg.id !== id));
+  };
+
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
@@ -113,7 +157,7 @@ const MessagesPage: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <MessageOutlined style={{ fontSize: '32px', color: '#1890ff', marginBottom: '8px' }} />
               <Title level={4}>总消息</Title>
-              <Text strong>4</Text>
+              <Text strong>{messages.length}</Text>
             </div>
           </Card>
         </Col>
@@ -122,7 +166,7 @@ const MessagesPage: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <BellOutlined style={{ fontSize: '32px', color: '#fa8c16', marginBottom: '8px' }} />
               <Title level={4}>未读消息</Title>
-              <Text strong type="warning">1</Text>
+              <Text strong type="warning">{messages.filter(msg => msg.status === 'unread').length}</Text>
             </div>
           </Card>
         </Col>
@@ -180,13 +224,13 @@ const MessagesPage: React.FC = () => {
                             回复
                           </Space>
                         </Button>,
-                        <Button type="link" key={`mark-${item.id}`}>
+                        <Button type="link" key={`mark-${item.id}`} onClick={() => handleMarkAsRead(item.id)}>
                           <Space>
                             <CheckCircleOutlined />
                             {item.status === 'unread' ? '标记已读' : '标记未读'}
                           </Space>
                         </Button>,
-                        <Button type="link" key={`delete-${item.id}`}>
+                        <Button type="link" key={`delete-${item.id}`} onClick={() => handleDeleteMessage(item.id)}>
                           <Space>
                             <ExclamationCircleOutlined />
                             删除
