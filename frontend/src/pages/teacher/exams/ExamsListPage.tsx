@@ -1,12 +1,18 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tag, Statistic, Divider } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Row, Col, Button, Typography, Space, Table, Tag, Statistic, Divider, Input } from 'antd';
 import { BarChartOutlined, BookOutlined, SearchOutlined, PlusOutlined, EditOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { examService } from '../../../services';
 
 const { Title, Text } = Typography;
+const { Search } = Input;
 
 const ExamsListPage: React.FC = () => {
+  const [exams, setExams] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
   // 模拟考试数据
-  const exams = [
+  const mockExams = [
     {
       id: '1',
       title: 'React 基础测试',
@@ -52,6 +58,50 @@ const ExamsListPage: React.FC = () => {
       status: '未开始',
     },
   ];
+
+  // 获取考试列表
+  const fetchExams = async () => {
+    setLoading(true);
+    try {
+      const response = await examService.getExams({
+        title: searchText || undefined,
+      });
+      // 如果后端返回了数据，使用后端数据，否则使用模拟数据
+      if (response.data.exams && response.data.exams.length > 0) {
+        // 转换后端数据格式以匹配现有表格结构
+        const formattedExams = response.data.exams.map((exam: any) => ({
+          id: exam.id.toString(),
+          title: exam.title,
+          course: exam.courseTitle || '未知课程',
+          date: new Date(exam.startTime).toISOString().split('T')[0],
+          time: `${Math.floor((new Date(exam.endTime).getTime() - new Date(exam.startTime).getTime()) / (1000 * 60))}分钟`,
+          students: 0, // 后端未返回，使用默认值
+          participated: 0, // 后端未返回，使用默认值
+          graded: 0, // 后端未返回，使用默认值
+          status: exam.status || '未知',
+        }));
+        setExams(formattedExams);
+      } else {
+        setExams(mockExams);
+      }
+    } catch (error) {
+      console.error('获取考试列表失败:', error);
+      // 发生错误时使用模拟数据
+      setExams(mockExams);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初始化加载数据
+  useEffect(() => {
+    fetchExams();
+  }, [searchText]);
+
+  // 处理搜索
+  const handleSearch = (value: string) => {
+    setSearchText(value);
+  };
 
   const columns = [
     {
@@ -222,7 +272,14 @@ const ExamsListPage: React.FC = () => {
                 <Button icon={<EditOutlined />}>批量操作</Button>
               </Space>
               <Space>
-                <Button icon={<SearchOutlined />}>搜索考试</Button>
+                <Search
+                  placeholder="搜索考试"
+                  allowClear
+                  enterButton={<SearchOutlined />}
+                  size="middle"
+                  onSearch={handleSearch}
+                  style={{ width: 200 }}
+                />
                 <Button>按状态筛选</Button>
               </Space>
             </div>
@@ -231,6 +288,7 @@ const ExamsListPage: React.FC = () => {
               dataSource={exams} 
               columns={columns} 
               rowKey="id"
+              loading={loading}
               pagination={{
                 pageSize: 10,
                 showSizeChanger: true,

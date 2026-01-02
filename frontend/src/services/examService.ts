@@ -121,7 +121,7 @@ export interface StatisticsResponse {
 // Exam Service
 export const examService = {
   // 获取考试列表
-  async getExams(params?: { courseId?: number; page?: number; pageSize?: number }): Promise<ExamsResponse> {
+  async getExams(params?: { courseId?: number; title?: string; page?: number; pageSize?: number }): Promise<ExamsResponse> {
     return api.get('/exams', { params })
   },
 

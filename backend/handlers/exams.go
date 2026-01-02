@@ -40,6 +40,7 @@ type SubmitExamRequest struct {
 // GetExams 获取考试列表
 func GetExams(c *gin.Context) {
 	courseID := c.Query("courseId")
+	title := c.Query("title")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 
@@ -55,6 +56,11 @@ func GetExams(c *gin.Context) {
 	if courseID != "" {
 		query += " AND course_id = ?"
 		args = append(args, courseID)
+	}
+
+	if title != "" {
+		query += " AND title LIKE ?"
+		args = append(args, "%"+title+"%")
 	}
 
 	query += " ORDER BY start_time DESC LIMIT ? OFFSET ?"
