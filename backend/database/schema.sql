@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE,
     avatar_url TEXT,
+    full_name TEXT,
+    phone TEXT,
+    gender TEXT,
+    bio TEXT,
     role TEXT NOT NULL DEFAULT 'STUDENT' CHECK(role IN ('STUDENT', 'INSTRUCTOR', 'ADMIN')),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

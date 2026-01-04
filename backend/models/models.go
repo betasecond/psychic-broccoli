@@ -9,6 +9,10 @@ type User struct {
 	PasswordHash string    `json:"-"` // 不返回给前端
 	Email        *string   `json:"email,omitempty"`
 	AvatarURL    *string   `json:"avatarUrl,omitempty"`
+	FullName     *string   `json:"fullName,omitempty"`
+	Phone        *string   `json:"phone,omitempty"`
+	Gender       *string   `json:"gender,omitempty"`
+	Bio          *string   `json:"bio,omitempty"`
 	Role         string    `json:"role"` // STUDENT, INSTRUCTOR, ADMIN
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`

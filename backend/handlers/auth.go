@@ -36,6 +36,10 @@ type RegisterRequest struct {
 type UpdateProfileRequest struct {
 	Email     *string `json:"email"`
 	AvatarURL *string `json:"avatarUrl"`
+	FullName  *string `json:"fullName"`
+	Phone     *string `json:"phone"`
+	Gender    *string `json:"gender"`
+	Bio       *string `json:"bio"`
 }
 
 // ChangePasswordRequest 修改密码请求
@@ -161,10 +165,11 @@ func GetCurrentUser(c *gin.Context) {
 
 	var user models.User
 	err := database.DB.QueryRow(`
-		SELECT id, username, email, avatar_url, role, created_at, updated_at
+		SELECT id, username, email, avatar_url, full_name, phone, gender, bio, role, created_at, updated_at
 		FROM users WHERE id = ?
 	`, userID).Scan(
 		&user.ID, &user.Username, &user.Email, &user.AvatarURL,
+		&user.FullName, &user.Phone, &user.Gender, &user.Bio, 
 		&user.Role, &user.CreatedAt, &user.UpdatedAt,
 	)
 
@@ -192,9 +197,9 @@ func UpdateProfile(c *gin.Context) {
 
 	// 更新用户信息
 	_, err := database.DB.Exec(`
-		UPDATE users SET email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP
+		UPDATE users SET email = ?, avatar_url = ?, full_name = ?, phone = ?, gender = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, req.Email, req.AvatarURL, userID)
+	`, req.Email, req.AvatarURL, req.FullName, req.Phone, req.Gender, req.Bio, userID)
 
 	if err != nil {
 		utils.InternalServerError(c, "更新失败")
@@ -204,10 +209,11 @@ func UpdateProfile(c *gin.Context) {
 	// 返回更新后的用户信息
 	var user models.User
 	database.DB.QueryRow(`
-		SELECT id, username, email, avatar_url, role, created_at, updated_at
+		SELECT id, username, email, avatar_url, full_name, phone, gender, bio, role, created_at, updated_at
 		FROM users WHERE id = ?
 	`, userID).Scan(
 		&user.ID, &user.Username, &user.Email, &user.AvatarURL,
+		&user.FullName, &user.Phone, &user.Gender, &user.Bio, 
 		&user.Role, &user.CreatedAt, &user.UpdatedAt,
 	)
 

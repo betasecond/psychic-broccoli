@@ -69,6 +69,14 @@ func main() {
 			}
 		}
 
+		// 用户路由
+		users := v1.Group("/users")
+		users.Use(middleware.AuthMiddleware())
+		{
+			// 获取指定用户资料 (需要管理员权限)
+			users.GET("/:id", handlers.GetUserProfile)
+		}
+
 		// 课程分类路由
 		categories := v1.Group("/categories")
 		{

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+    "database/sql"
     "fmt"
     "path/filepath"
     "strings"
 
     "github.com/gin-gonic/gin"
     "github.com/online-education-platform/backend/database"
+    "github.com/online-education-platform/backend/models"
     "github.com/online-education-platform/backend/utils"
     "github.com/xuri/excelize/v2"
     "golang.org/x/crypto/bcrypt"
@@ -218,5 +220,43 @@ func DownloadUserTemplate(c *gin.Context) {
 		utils.InternalServerError(c, "生成模板失败")
 		return
 	}
+}
+
+// GetUserProfile 获取指定用户资料
+func GetUserProfile(c *gin.Context) {
+	// 只有管理员可以查看其他用户资料
+	role, _ := c.Get("role")
+	if role != "ADMIN" {
+		utils.Forbidden(c, "只有管理员可以查看其他用户资料")
+		return
+	}
+
+	// 获取用户ID
+	userID := c.Param("id")
+	if userID == "" {
+		utils.BadRequest(c, "用户ID不能为空")
+		return
+	}
+
+	var user models.User
+	err := database.DB.QueryRow(`
+		SELECT id, username, email, avatar_url, full_name, phone, gender, bio, role, created_at, updated_at
+		FROM users WHERE id = ?
+	`, userID).Scan(
+		&user.ID, &user.Username, &user.Email, &user.AvatarURL,
+		&user.FullName, &user.Phone, &user.Gender, &user.Bio, 
+		&user.Role, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		utils.NotFound(c, "用户不存在")
+		return
+	}
+	if err != nil {
+		utils.InternalServerError(c, "服务器错误")
+		return
+	}
+
+	utils.Success(c, user)
 }
 
