@@ -28,8 +28,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }, [dispatch, token, user, loading])
 
-  // Show loading spinner while checking authentication
-  if (loading) {
+  // token 存在但 user 还没加载出来时：展示加载态并等待 useEffect 拉取用户信息
+  // 不能在这里直接跳转登录页，否则会出现“短暂 user=null 就被重定向/卡死”的问题。
+  const isCheckingAuth = !!token && !user
+
+  if (isCheckingAuth) {
     return (
       <div
         style={{
@@ -46,11 +49,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If no token, redirect to login
   if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />
-  }
-
-  // If token exists but user info failed to load, redirect to login
-  if (token && !user && !loading) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

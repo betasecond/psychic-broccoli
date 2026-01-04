@@ -20,7 +20,6 @@ import { useAppSelector, useAppDispatch } from '../store'
 import {
   updateProfileAsync,
   changePasswordAsync,
-  getCurrentUserAsync,
   getUserProfileAsync,
 } from '../store/slices/authSlice'
 import { AvatarUpload, PasswordChangeForm } from '../components'
@@ -50,11 +49,6 @@ const ProfilePage: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState<string>('')
   const [viewedUser, setViewedUser] = useState<any>(null)
   const [fetchingOtherUser, setFetchingOtherUser] = useState(false)
-
-  useEffect(() => {
-    // Load current user data when component mounts
-    dispatch(getCurrentUserAsync())
-  }, [dispatch])
 
   // Determine if we're viewing someone else's profile
   const isViewingOthersProfile = !!userId && userId !== user?.userId?.toString()
