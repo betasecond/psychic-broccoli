@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar, Modal, Upload, message } from 'antd';
-import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons';
+import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined, UploadOutlined, InboxOutlined, EyeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { userService } from '../../services/userService';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 const { Dragger } = Upload;
 
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState<any[]>([]);
+
+  // 查看用户资料
+  const handleViewProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
+  };
 
   // 下载导入模板
   const handleDownloadTemplate = async () => {
@@ -245,8 +252,9 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: () => (
+      render: (_, record) => (
         <Space size="middle">
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>
@@ -315,8 +323,9 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: () => (
+      render: (_, record) => (
         <Space size="middle">
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>
@@ -385,8 +394,9 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: () => (
+      render: (_, record) => (
         <Space size="middle">
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>

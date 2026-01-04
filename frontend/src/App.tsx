@@ -456,7 +456,7 @@ function App() {
               
               {/* Profile page - available to all authenticated users */}
               <Route
-                path="/profile"
+                path="/profile/:userId?"
                 element={
                   <ProtectedRoute>
                     <AppLayout>
