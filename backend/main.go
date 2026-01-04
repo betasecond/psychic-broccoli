@@ -149,6 +149,27 @@ func main() {
 			exams.GET("/:id/results", handlers.GetExamResults)
 			exams.GET("/submissions/:id", handlers.GetExamSubmissionDetail)
 		}
+
+		// 消息路由
+		messages := v1.Group("/messages")
+		messages.Use(middleware.AuthMiddleware())
+		{
+			messages.GET("", handlers.GetMessages)
+			messages.PUT("/:id/status", handlers.MarkMessageStatus)
+			messages.DELETE("/:id", handlers.DeleteMessage)
+		}
+
+		// 通知路由
+		notifications := v1.Group("/notifications")
+		{
+			notifications.GET("", handlers.GetNotifications)
+		}
+
+		// 讨论路由
+		discussions := v1.Group("/discussions")
+		{
+			discussions.GET("", handlers.GetDiscussions)
+		}
 	}
 
 	// 健康检查

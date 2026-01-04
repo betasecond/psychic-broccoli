@@ -8,6 +8,7 @@ import authReducer from './slices/authSlice'
 import assignmentReducer from './slices/assignmentSlice'
 import examReducer from './slices/examSlice'
 import courseReducer from './slices/courseSlice'
+import messageReducer from './slices/messageSlice'
 import { authMiddleware } from './middleware/authMiddleware'
 
 // Configure store
@@ -17,6 +18,7 @@ export const store = configureStore({
     assignment: assignmentReducer,
     exam: examReducer,
     course: courseReducer,
+    messages: messageReducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
@@ -73,3 +75,10 @@ export const selectCourseChapters = (state: RootState) => state.course.chapters
 export const selectCourseStatistics = (state: RootState) => state.course.statistics
 export const selectCourseLoading = (state: RootState) => state.course.loading
 export const selectCourseError = (state: RootState) => state.course.error
+
+// Message Selectors
+export const selectMessages = (state: RootState) => state.messages.messages
+export const selectNotifications = (state: RootState) => state.messages.notifications
+export const selectDiscussions = (state: RootState) => state.messages.discussions
+export const selectMessagesLoading = (state: RootState) => state.messages.loading
+export const selectMessagesError = (state: RootState) => state.messages.error

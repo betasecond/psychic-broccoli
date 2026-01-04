@@ -131,3 +131,38 @@ type ExamAnswer struct {
 	ScoreAwarded  *float64 `json:"scoreAwarded,omitempty"`
 }
 
+// Message 消息模型
+type Message struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"userId"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	Date      string    `json:"date"`
+	Type      string    `json:"type"`
+	Status    string    `json:"status"` // read, unread
+	Sender    string    `json:"sender"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Notification 通知模型
+type Notification struct {
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	Date      string    `json:"date"`
+	Type      string    `json:"type"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Discussion 讨论模型
+type Discussion struct {
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	Course    string    `json:"course"`
+	Author    string    `json:"author"`
+	Replies   int       `json:"replies"`
+	LastReply string    `json:"lastReply"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+

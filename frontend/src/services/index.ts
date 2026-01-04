@@ -5,6 +5,7 @@ export { assignmentService } from './assignmentService'
 export { examService } from './examService'
 export { courseService } from './courseService'
 export { userService } from './userService'
+export { messageService } from './messageService'
 
 // Export types
 export type {
@@ -49,3 +50,10 @@ export type {
   CreateChapterRequest,
   UpdateChapterRequest,
 } from './courseService'
+
+export type {
+  Message,
+  Notification,
+  Discussion,
+  MarkMessageStatusRequest,
+} from './messageService'
