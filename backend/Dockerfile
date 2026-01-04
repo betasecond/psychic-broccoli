@@ -6,6 +6,10 @@
 # --- Stage 1: Build the Go binary ---
 FROM golang:1.24-alpine AS builder
 
+# Avoid auto-downloading Go toolchains during docker build (go.mod has `toolchain ...`).
+# This makes CI/buildx more reliable in restricted network environments.
+ENV GOTOOLCHAIN=local
+
 # Install build dependencies for CGO (SQLite requires CGO)
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
