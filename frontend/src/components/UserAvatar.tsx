@@ -6,16 +6,24 @@ import {
   CrownOutlined,
   BookOutlined,
   TeamOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAppSelector } from '../store'
+import { useAppSelector, useAppDispatch } from '../store'
+import { logoutAsync } from '../store/slices/authSlice'
 
 const UserAvatar: React.FC = () => {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const { user } = useAppSelector(state => state.auth)
 
   const handleProfile = () => {
     navigate('/profile')
+  }
+
+  const handleLogout = () => {
+    dispatch(logoutAsync())
+    navigate('/login')
   }
 
   // Default user when no authentication
@@ -97,6 +105,12 @@ const UserAvatar: React.FC = () => {
       label: '个人资料',
       icon: <SettingOutlined />,
       onClick: handleProfile,
+    },
+    {
+      key: 'logout',
+      label: '退出登录',
+      icon: <LogoutOutlined />,
+      onClick: handleLogout,
     },
   ]
 
