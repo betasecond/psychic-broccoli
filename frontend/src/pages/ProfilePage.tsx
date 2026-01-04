@@ -21,6 +21,7 @@ import {
   updateProfileAsync,
   changePasswordAsync,
   getCurrentUserAsync,
+  getUserProfileAsync,
 } from '../store/slices/authSlice'
 import { AvatarUpload, PasswordChangeForm } from '../components'
 import './ProfilePage.css'
@@ -48,6 +49,7 @@ const ProfilePage: React.FC = () => {
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string>('')
   const [viewedUser, setViewedUser] = useState<any>(null)
+  const [fetchingOtherUser, setFetchingOtherUser] = useState(false)
 
   useEffect(() => {
     // Load current user data when component mounts
@@ -55,11 +57,39 @@ const ProfilePage: React.FC = () => {
   }, [dispatch])
 
   // Determine if we're viewing someone else's profile
-  const isViewingOthersProfile = !!userId && userId !== user?.id
+  const isViewingOthersProfile = !!userId && userId !== user?.userId?.toString()
 
   useEffect(() => {
-    // Update form and avatar when user data changes
-    if (user) {
+    // Get specified user's profile if userId is provided and it's not the current user
+    const fetchUserProfile = async () => {
+      if (isViewingOthersProfile && userId) {
+        setFetchingOtherUser(true)
+        try {
+          const result = await dispatch(getUserProfileAsync(userId)).unwrap()
+          setViewedUser(result)
+          setAvatarUrl(result.avatarUrl || '')
+          profileForm.setFieldsValue({
+            email: result.email || '',
+            fullName: result.fullName || '',
+            phone: result.phone || '',
+            gender: result.gender || '',
+            bio: result.bio || '',
+            avatarUrl: result.avatarUrl || '',
+          })
+        } catch (error) {
+          message.error('获取用户信息失败')
+        } finally {
+          setFetchingOtherUser(false)
+        }
+      }
+    }
+
+    fetchUserProfile()
+  }, [isViewingOthersProfile, userId, dispatch, profileForm])
+
+  useEffect(() => {
+    // Update form and avatar when current user data changes (not viewing others)
+    if (user && !isViewingOthersProfile) {
       profileForm.setFieldsValue({
         email: user.email || '',
         fullName: user.fullName || '',
@@ -70,7 +100,7 @@ const ProfilePage: React.FC = () => {
       })
       setAvatarUrl(user.avatarUrl || '')
     }
-  }, [user, profileForm])
+  }, [user, profileForm, isViewingOthersProfile])
 
   const handleProfileSave = async (values: ProfileFormData) => {
     try {
@@ -105,7 +135,11 @@ const ProfilePage: React.FC = () => {
     message.success('头像上传成功，请保存个人信息以完成更新')
   }
 
-  if (!user) {
+  // Determine which user to display
+  const displayUser = isViewingOthersProfile ? viewedUser : user
+
+  // Show loading state if user data is not available
+  if (!displayUser) {
     return (
       <div className="profile-loading">
         <Card loading />
@@ -129,10 +163,10 @@ const ProfilePage: React.FC = () => {
                 />
               </div>
               <div className="user-info">
-                <h3>{user?.fullName || user?.username}</h3>
+                <h3>{displayUser?.fullName || displayUser?.username}</h3>
                 <p className="user-role">
-                  {user?.role === 'STUDENT' ? '学生' : 
-                   user?.role === 'INSTRUCTOR' ? '教师' : '管理员'}
+                  {displayUser?.role === 'STUDENT' ? '学生' : 
+                   displayUser?.role === 'INSTRUCTOR' ? '教师' : '管理员'}
                 </p>
               </div>
             </div>
@@ -142,7 +176,7 @@ const ProfilePage: React.FC = () => {
         <Col xs={24} md={16}>
           {/* Profile Information Card */}
           <Card
-            title={isViewingOthersProfile ? `${user?.fullName || user?.username} 的个人信息` : "个人信息"}
+            title={isViewingOthersProfile ? `${displayUser?.fullName || displayUser?.username} 的个人信息` : "个人信息"}
             extra={
               !isViewingOthersProfile && (
                 <Space>
@@ -163,7 +197,7 @@ const ProfilePage: React.FC = () => {
                         type="primary"
                         icon={<SaveOutlined />}
                         onClick={() => profileForm.submit()}
-                        loading={loading}
+                        loading={loading || fetchingOtherUser}
                       >
                         保存
                       </Button>
@@ -180,7 +214,7 @@ const ProfilePage: React.FC = () => {
               disabled={!isEditing || isViewingOthersProfile}
             >
               <Form.Item label="用户名">
-                <Input value={user?.username} disabled />
+                <Input value={displayUser?.username} disabled />
               </Form.Item>
 
               <Form.Item
@@ -231,8 +265,8 @@ const ProfilePage: React.FC = () => {
               <Form.Item label="角色">
                 <Input
                   value={
-                    user?.role === 'STUDENT' ? '学生' : 
-                    user?.role === 'INSTRUCTOR' ? '教师' : '管理员'
+                    displayUser?.role === 'STUDENT' ? '学生' : 
+                    displayUser?.role === 'INSTRUCTOR' ? '教师' : '管理员'
                   }
                   disabled
                 />

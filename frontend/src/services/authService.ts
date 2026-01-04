@@ -36,6 +36,10 @@ export interface UserResponse {
   email?: string
   avatarUrl?: string
   role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN'
+  fullName?: string
+  phone?: string
+  gender?: string
+  bio?: string
 }
 
 export interface UpdateProfileRequest {
@@ -90,6 +94,14 @@ class AuthService {
     profileData: UpdateProfileRequest
   ): Promise<UserResponse> {
     const response = await api.put('/auth/profile', profileData)
+    return response.data
+  }
+
+  /**
+   * Get user profile by user ID
+   */
+  async getUserProfile(userId: string): Promise<UserResponse> {
+    const response = await api.get(`/users/${userId}`)
     return response.data
   }
 

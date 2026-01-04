@@ -13,6 +13,10 @@ export interface User {
   email?: string
   avatarUrl?: string
   role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN'
+  fullName?: string
+  phone?: string
+  gender?: string
+  bio?: string
 }
 
 export interface AuthState {
@@ -95,18 +99,38 @@ export const getCurrentUserAsync = createAsyncThunk(
 export const updateProfileAsync = createAsyncThunk(
   'auth/updateProfile',
   async (
-    profileData: { email?: string; avatarUrl?: string },
+    profileData: { email?: string; avatarUrl?: string; fullName?: string; phone?: string; gender?: string; bio?: string },
     { rejectWithValue }
   ) => {
     try {
       const response = await authService.updateProfile(profileData)
       return response
     } catch (error) {
-      const errorMessage =
+      const errorMessage = 
         error instanceof Error && 'response' in error
           ? (error as { response?: { data?: { message?: string } } }).response
               ?.data?.message || '更新个人信息失败'
           : '更新个人信息失败'
+      return rejectWithValue(errorMessage)
+    }
+  }
+)
+
+export const getUserProfileAsync = createAsyncThunk(
+  'auth/getUserProfile',
+  async (
+    userId: string,
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await authService.getUserProfile(userId)
+      return response
+    } catch (error) {
+      const errorMessage = 
+        error instanceof Error && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message || '获取用户信息失败'
+          : '获取用户信息失败'
       return rejectWithValue(errorMessage)
     }
   }
