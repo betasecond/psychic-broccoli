@@ -21,7 +21,7 @@ COPY . .
 # Build with CGO enabled for SQLite support
 # Use static linking for alpine compatibility
 RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags="-w -s -linkmode external -extldflags '-static'" \
+    -ldflags="-w -s" \
     -o server main.go
 
 # --- Stage 2: Production runtime image ---
