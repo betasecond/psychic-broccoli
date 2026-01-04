@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"strings"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
