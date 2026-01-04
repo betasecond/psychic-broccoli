@@ -45,13 +45,17 @@ func InitDB(dbPath string) error {
 
 // autoMigrate 集中管理所有的数据库变更
 func autoMigrate() error {
-	// 示例：检查 assignments 表是否有 attachments 列
+	
+	// 1. assignments 表
 	if err := addColumnIfNotExists("assignments", "attachments", "TEXT"); err != nil {
 		return err
 	}
-	
-	// 以后如果你要在 users 表加一个 phone 字段，就加一行：
-	// if err := addColumnIfNotExists("users", "phone", "TEXT"); err != nil { return err }
+
+	// 2. users 表 - 必须加上这部分来修复 full_name 缺失问题
+	if err := addColumnIfNotExists("users", "full_name", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("users", "phone", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("users", "gender", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("users", "bio", "TEXT"); err != nil { return err }
 
 	return nil
 }
