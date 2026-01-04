@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar, Modal, Upload, message } from 'antd';
 import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined, UploadOutlined, InboxOutlined, EyeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import { userService } from '../../services/userService';
+import { userService, type User } from '../../services/userService';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
@@ -14,10 +14,46 @@ const UsersPage: React.FC = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState<any[]>([]);
+  const [students, setStudents] = useState<User[]>([]);
+  const [instructors, setInstructors] = useState<User[]>([]);
+  const [admins, setAdmins] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('students');
 
   // 查看用户资料
-  const handleViewProfile = (userId: string) => {
+  const handleViewProfile = (userId: number) => {
     navigate(`/profile/${userId}`);
+  };
+
+  // 获取用户列表
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      // 获取所有用户
+      const allUsersResponse = await userService.getUsers({ page: 1, pageSize: 1000 });
+      const allUsers = allUsersResponse.users;
+
+      // 按角色分类
+      setStudents(allUsers.filter(user => user.role === 'STUDENT'));
+      setInstructors(allUsers.filter(user => user.role === 'INSTRUCTOR'));
+      setAdmins(allUsers.filter(user => user.role === 'ADMIN'));
+    } catch (error) {
+      message.error('获取用户列表失败');
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 组件挂载时获取用户列表
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // 切换标签时刷新数据
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    fetchUsers();
   };
 
   // 下载导入模板
@@ -108,91 +144,16 @@ const UsersPage: React.FC = () => {
     },
   };
 
-  // 模拟用户数据
-  const students = [
-    {
-      id: 's1',
-      name: '张三',
-      username: 'zhangsan',
-      email: 'zhangsan@example.com',
-      course: 'React 深入浅出',
-      status: '活跃',
-      role: 'STUDENT',
-      lastLogin: '2024-03-18',
-      regDate: '2024-01-15'
-    },
-    {
-      id: 's2',
-      name: '李四',
-      username: 'lisi',
-      email: 'lisi@example.com',
-      course: 'TypeScript 实战',
-      status: '一般',
-      role: 'STUDENT',
-      lastLogin: '2024-03-17',
-      regDate: '2024-01-20'
-    },
-    {
-      id: 's3',
-      name: '王五',
-      username: 'wangwu',
-      email: 'wangwu@example.com',
-      course: '前端开发基础',
-      status: '优秀',
-      role: 'STUDENT',
-      lastLogin: '2024-03-18',
-      regDate: '2024-02-01'
-    },
-  ];
-
-  const instructors = [
-    {
-      id: 'i1',
-      name: '张老师',
-      username: 'zhanglaoshi',
-      email: 'zhang@example.com',
-      courses: 3,
-      status: '活跃',
-      role: 'INSTRUCTOR',
-      lastLogin: '2024-03-18',
-      regDate: '2024-01-10'
-    },
-    {
-      id: 'i2',
-      name: '李老师',
-      username: 'lilaoshi',
-      email: 'li@example.com',
-      courses: 2,
-      status: '活跃',
-      role: 'INSTRUCTOR',
-      lastLogin: '2024-03-17',
-      regDate: '2024-01-12'
-    },
-  ];
-
-  const admins = [
-    {
-      id: 'a1',
-      name: '系统管理员',
-      username: 'admin',
-      email: 'admin@example.com',
-      status: '活跃',
-      role: 'ADMIN',
-      lastLogin: '2024-03-18',
-      regDate: '2024-01-01'
-    },
-  ];
-
   const studentColumns = [
     {
       title: '姓名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string, record: any) => (
+      dataIndex: 'fullName',
+      key: 'fullName',
+      render: (fullName: string, record: User) => (
         <Space>
           <Avatar size="small" icon={<UserOutlined />} style={{ backgroundColor: '#52c41a' }} />
           <div>
-            <div><Text strong>{name}</Text></div>
+            <div><Text strong>{fullName || record.username}</Text></div>
             <div style={{ fontSize: '12px', color: '#666' }}>@{record.username}</div>
           </div>
         </Space>
@@ -205,56 +166,39 @@ const UsersPage: React.FC = () => {
     },
     {
       title: '注册日期',
-      dataIndex: 'regDate',
-      key: 'regDate',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
       render: (date: string) => (
         <Space>
           <CalendarOutlined />
-          <span>{date}</span>
+          <span>{new Date(date).toLocaleDateString()}</span>
         </Space>
       ),
     },
     {
-      title: '当前课程',
-      dataIndex: 'course',
-      key: 'course',
-    },
-    {
       title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        let color = 'default';
-        switch(status) {
-          case '优秀':
-            color = 'green';
-            break;
-          case '活跃':
-            color = 'blue';
-            break;
-          case '一般':
-            color = 'orange';
-            break;
-          case '不活跃':
-            color = 'red';
-            break;
-          default:
-            color = 'default';
-        }
+      dataIndex: 'active',
+      key: 'active',
+      render: (active: boolean, record: any) => {
+        const status = active ? '活跃' : '不活跃';
+        let color = active ? 'blue' : 'red';
         return <Tag color={color}>{status}</Tag>;
       },
     },
     {
       title: '最后登录',
-      dataIndex: 'lastLogin',
-      key: 'lastLogin',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (date: string) => (
+        <span>{new Date(date).toLocaleString()}</span>
+      ),
     },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
+      render: (_, record: User) => (
         <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>
@@ -265,13 +209,13 @@ const UsersPage: React.FC = () => {
   const instructorColumns = [
     {
       title: '姓名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string, record: any) => (
+      dataIndex: 'fullName',
+      key: 'fullName',
+      render: (fullName: string, record: User) => (
         <Space>
           <Avatar size="small" icon={<BookOutlined />} style={{ backgroundColor: '#1890ff' }} />
           <div>
-            <div><Text strong>{name}</Text></div>
+            <div><Text strong>{fullName || record.username}</Text></div>
             <div style={{ fontSize: '12px', color: '#666' }}>@{record.username}</div>
           </div>
         </Space>
@@ -283,49 +227,29 @@ const UsersPage: React.FC = () => {
       key: 'email',
     },
     {
-      title: '课程数',
-      dataIndex: 'courses',
-      key: 'courses',
-      render: (courses: number) => (
-        <Space>
-          <BookOutlined />
-          <span>{courses}</span>
-        </Space>
-      ),
-    },
-    {
       title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        let color = 'default';
-        switch(status) {
-          case '活跃':
-            color = 'blue';
-            break;
-          case '一般':
-            color = 'orange';
-            break;
-          case '不活跃':
-            color = 'red';
-            break;
-          default:
-            color = 'default';
-        }
+      dataIndex: 'active',
+      key: 'active',
+      render: (active: boolean, record: any) => {
+        const status = active ? '活跃' : '不活跃';
+        let color = active ? 'blue' : 'red';
         return <Tag color={color}>{status}</Tag>;
       },
     },
     {
       title: '最后登录',
-      dataIndex: 'lastLogin',
-      key: 'lastLogin',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (date: string) => (
+        <span>{new Date(date).toLocaleString()}</span>
+      ),
     },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
+      render: (_, record: User) => (
         <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>
@@ -336,13 +260,13 @@ const UsersPage: React.FC = () => {
   const adminColumns = [
     {
       title: '姓名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string, record: any) => (
+      dataIndex: 'fullName',
+      key: 'fullName',
+      render: (fullName: string, record: User) => (
         <Space>
           <Avatar size="small" icon={<CrownOutlined />} style={{ backgroundColor: '#fa8c16' }} />
           <div>
-            <div><Text strong>{name}</Text></div>
+            <div><Text strong>{fullName || record.username}</Text></div>
             <div style={{ fontSize: '12px', color: '#666' }}>@{record.username}</div>
           </div>
         </Space>
@@ -355,48 +279,39 @@ const UsersPage: React.FC = () => {
     },
     {
       title: '注册日期',
-      dataIndex: 'regDate',
-      key: 'regDate',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
       render: (date: string) => (
         <Space>
           <CalendarOutlined />
-          <span>{date}</span>
+          <span>{new Date(date).toLocaleDateString()}</span>
         </Space>
       ),
     },
     {
       title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => {
-        let color = 'default';
-        switch(status) {
-          case '活跃':
-            color = 'blue';
-            break;
-          case '一般':
-            color = 'orange';
-            break;
-          case '不活跃':
-            color = 'red';
-            break;
-          default:
-            color = 'default';
-        }
+      dataIndex: 'active',
+      key: 'active',
+      render: (active: boolean, record: any) => {
+        const status = active ? '活跃' : '不活跃';
+        let color = active ? 'blue' : 'red';
         return <Tag color={color}>{status}</Tag>;
       },
     },
     {
       title: '最后登录',
-      dataIndex: 'lastLogin',
-      key: 'lastLogin',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (date: string) => (
+        <span>{new Date(date).toLocaleString()}</span>
+      ),
     },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
+      render: (_, record: User) => (
         <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.id)}>查看资料</Button>
+          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
           <Button type="link" icon={<MailOutlined />}>发送消息</Button>
           <Button type="link" icon={<EditOutlined />}>编辑</Button>
         </Space>
@@ -413,37 +328,37 @@ const UsersPage: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card loading={loading}>
             <Statistic
               title="总用户数"
-              value={457}
+              value={students.length + instructors.length + admins.length}
               prefix={<UserOutlined />}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card loading={loading}>
             <Statistic
               title="学生数"
-              value={389}
+              value={students.length}
               prefix={<TeamOutlined />}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card loading={loading}>
             <Statistic
               title="教师数"
-              value={65}
+              value={instructors.length}
               prefix={<BookOutlined />}
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card loading={loading}>
             <Statistic
               title="管理员数"
-              value={3}
+              value={admins.length}
               prefix={<CrownOutlined />}
             />
           </Card>
@@ -475,12 +390,17 @@ const UsersPage: React.FC = () => {
               </Space>
             </div>
             
-            <Tabs defaultActiveKey="students">
+            <Tabs 
+              defaultActiveKey="students" 
+              activeKey={activeTab}
+              onChange={handleTabChange}
+            >
               <TabPane tab="学生管理" key="students">
                 <Table 
                   dataSource={students} 
                   columns={studentColumns} 
-                  rowKey="id"
+                  rowKey="userId"
+                  loading={loading}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
@@ -493,7 +413,8 @@ const UsersPage: React.FC = () => {
                 <Table 
                   dataSource={instructors} 
                   columns={instructorColumns} 
-                  rowKey="id"
+                  rowKey="userId"
+                  loading={loading}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
@@ -506,7 +427,8 @@ const UsersPage: React.FC = () => {
                 <Table 
                   dataSource={admins} 
                   columns={adminColumns} 
-                  rowKey="id"
+                  rowKey="userId"
+                  loading={loading}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,

@@ -8,6 +8,30 @@ export interface ImportUsersResponse {
   message: string
 }
 
+// 用户列表响应
+export interface UserListResponse {
+  users: any[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+// 用户信息
+export interface User {
+  userId: number
+  username: string
+  fullName?: string
+  email?: string
+  avatarUrl?: string
+  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN'
+  phone?: string
+  gender?: string
+  bio?: string
+  createdAt: string
+  updatedAt: string
+}
+
 // 用户服务类
 class UserService {
   /**
@@ -48,6 +72,14 @@ class UserService {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
+  }
+
+  /**
+   * 获取用户列表
+   */
+  async getUsers(params: { page?: number; pageSize?: number; role?: string } = {}): Promise<UserListResponse> {
+    const response = await api.get('/users', { params })
+    return response.data
   }
 }
 

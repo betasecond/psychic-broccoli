@@ -73,6 +73,8 @@ func main() {
 		users := v1.Group("/users")
 		users.Use(middleware.AuthMiddleware())
 		{
+			// 获取用户列表 (需要管理员权限，支持分页和角色筛选)
+			users.GET("", handlers.GetUsers)
 			// 获取指定用户资料 (需要管理员权限)
 			users.GET("/:id", handlers.GetUserProfile)
 		}

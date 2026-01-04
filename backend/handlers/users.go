@@ -3,7 +3,9 @@ package handlers
 import (
     "database/sql"
     "fmt"
+    "math"
     "path/filepath"
+    "strconv"
     "strings"
 
     "github.com/gin-gonic/gin"
@@ -220,6 +222,95 @@ func DownloadUserTemplate(c *gin.Context) {
 		utils.InternalServerError(c, "生成模板失败")
 		return
 	}
+}
+
+// GetUsers 获取用户列表，支持分页和角色筛选
+func GetUsers(c *gin.Context) {
+	// 只有管理员可以查看用户列表
+	role, _ := c.Get("role")
+	if role != "ADMIN" {
+		utils.Forbidden(c, "只有管理员可以查看用户列表")
+		return
+	}
+
+	// 获取分页参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	// 获取角色筛选参数
+	roleFilter := c.Query("role")
+
+	// 构建查询语句
+	query := `SELECT id, username, email, avatar_url, full_name, phone, gender, bio, role, created_at, updated_at FROM users`
+	countQuery := `SELECT COUNT(*) FROM users`
+	args := []interface{}{}
+
+	// 添加角色筛选条件
+	if roleFilter != "" {
+		query += ` WHERE role = ?`
+		countQuery += ` WHERE role = ?`
+		args = append(args, roleFilter)
+	}
+
+	// 添加分页
+	offset := (page - 1) * pageSize
+	query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, pageSize, offset)
+
+	// 查询总记录数
+	var total int64
+	err := database.DB.QueryRow(countQuery, args[:len(args)-2]...).Scan(&total)
+	if err != nil {
+		utils.InternalServerError(c, "获取用户总数失败")
+		return
+	}
+
+	// 查询用户列表
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		utils.InternalServerError(c, "获取用户列表失败")
+		return
+	}
+	defer rows.Close()
+
+	// 处理查询结果
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(
+			&user.ID, &user.Username, &user.Email, &user.AvatarURL,
+			&user.FullName, &user.Phone, &user.Gender, &user.Bio, 
+			&user.Role, &user.CreatedAt, &user.UpdatedAt,
+		); err != nil {
+			utils.InternalServerError(c, "处理用户数据失败")
+			return
+		}
+		users = append(users, user)
+	}
+
+	// 检查遍历过程中是否有错误
+	if err := rows.Err(); err != nil {
+		utils.InternalServerError(c, "遍历用户数据失败")
+		return
+	}
+
+	// 计算总页数
+	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+
+	// 返回结果
+	utils.Success(c, gin.H{
+		"users":      users,
+		"page":       page,
+		"pageSize":   pageSize,
+		"total":      total,
+		"totalPages": totalPages,
+	})
 }
 
 // GetUserProfile 获取指定用户资料
