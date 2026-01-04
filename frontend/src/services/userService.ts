@@ -47,7 +47,7 @@ class UserService {
         'Content-Type': 'multipart/form-data',
       },
     })
-    return response.data
+    return response
   }
 
   /**
@@ -82,13 +82,13 @@ class UserService {
     const response = await api.get('/users', { params })
     
     // 确保用户列表中的每个用户都有userId字段（兼容后端返回的id字段）
-    const users = response.data.users.map((user: any) => ({
+    const users = response.users.map((user: any) => ({
       ...user,
       userId: user.id // 将后端的id字段映射到前端需要的userId字段
     }))
     
     return {
-      ...response.data,
+      ...response,
       users
     }
   }

@@ -68,7 +68,7 @@ class AuthService {
    */
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await api.post('/auth/login', credentials)
-    return response.data
+    return response
   }
 
   /**
@@ -76,7 +76,7 @@ class AuthService {
    */
   async register(userData: RegisterRequest): Promise<RegisterResponse> {
     const response = await api.post('/auth/register', userData)
-    return response.data
+    return response
   }
 
   /**
@@ -84,7 +84,7 @@ class AuthService {
    */
   async getCurrentUser(): Promise<UserResponse> {
     const response = await api.get('/auth/me')
-    return response.data
+    return response
   }
 
   /**
@@ -94,7 +94,7 @@ class AuthService {
     profileData: UpdateProfileRequest
   ): Promise<UserResponse> {
     const response = await api.put('/auth/profile', profileData)
-    return response.data
+    return response
   }
 
   /**
@@ -102,7 +102,7 @@ class AuthService {
    */
   async getUserProfile(userId: string): Promise<UserResponse> {
     const response = await api.get(`/users/${userId}`)
-    return response.data
+    return response
   }
 
   /**
@@ -117,7 +117,7 @@ class AuthService {
    */
   async getOssUploadCredentials(): Promise<OssUploadCredentialsResponse> {
     const response = await api.get('/auth/oss-credentials')
-    return response.data
+    return response
   }
 
   /**
@@ -154,7 +154,7 @@ class AuthService {
    */
   async checkUsernameAvailability(username: string): Promise<boolean> {
     const response = await api.get('/auth/check-username', { params: { username } })
-    return response.data.data
+    return response.data
   }
 
   /**
@@ -162,7 +162,7 @@ class AuthService {
    */
   async checkEmailAvailability(email: string): Promise<boolean> {
     const response = await api.get('/auth/check-email', { params: { email } })
-    return response.data.data
+    return response.data
   }
 }
 
