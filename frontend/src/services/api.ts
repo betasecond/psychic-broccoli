@@ -50,7 +50,13 @@ api.interceptors.response.use(
       })
     }
     
-    // Return the data directly for successful responses
+    // Handle response format: { code, message, data }
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      // Return the actual data from the response
+      return response.data.data
+    }
+    
+    // Fallback for unexpected response formats
     return response.data
   },
   async (error: AxiosError) => {

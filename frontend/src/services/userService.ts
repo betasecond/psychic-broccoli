@@ -19,7 +19,8 @@ export interface UserListResponse {
 
 // 用户信息
 export interface User {
-  userId: number
+  id: number
+  userId: number // 兼容旧字段名
   username: string
   fullName?: string
   email?: string
@@ -79,7 +80,17 @@ class UserService {
    */
   async getUsers(params: { page?: number; pageSize?: number; role?: string } = {}): Promise<UserListResponse> {
     const response = await api.get('/users', { params })
-    return response.data
+    
+    // 确保用户列表中的每个用户都有userId字段（兼容后端返回的id字段）
+    const users = response.data.users.map((user: any) => ({
+      ...user,
+      userId: user.id // 将后端的id字段映射到前端需要的userId字段
+    }))
+    
+    return {
+      ...response.data,
+      users
+    }
   }
 }
 
