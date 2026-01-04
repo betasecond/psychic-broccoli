@@ -45,11 +45,25 @@ export const loginAsync = createAsyncThunk(
   ) => {
     try {
       const response = await authService.login(credentials)
+
+      // 增加安全检查，防止 response 为空导致 TypeError
+      if (!response) {
+        throw new Error('登录失败：服务器未返回有效数据')
+      }
+      if (!response.accessToken) {
+        throw new Error('登录失败：未获取到访问令牌')
+      }
+
       // Save session using session manager
       sessionManager.saveSession(response.accessToken, response.user)
       return response
-    } catch (error) {
-      return rejectWithValue(error)
+    } catch (error: any) {
+      // 修复：提取错误信息字符串，而不是直接返回错误对象
+      const errorMessage = 
+        error.response?.data?.message ||
+        error.message ||
+        '登录失败，请重试'
+      return rejectWithValue(errorMessage)
     }
   }
 )
