@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -178,13 +179,16 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		utils.InternalServerError(c, "服务器错误")
+		// --- 修改开始：打印详细错误日志 ---
+		fmt.Printf("❌ [Auth] GetCurrentUser DB Error: %v\n", err)
+		// 暂时将错误详情返回给前端以便调试
+		utils.InternalServerError(c, fmt.Sprintf("服务器错误: %v", err))
 		return
+		// --- 修改结束 ---
 	}
 
 	utils.Success(c, user)
 }
-
 // UpdateProfile 更新用户资料
 func UpdateProfile(c *gin.Context) {
 	userID, _ := c.Get("userID")
