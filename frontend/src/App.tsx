@@ -42,7 +42,7 @@ import {
   SystemPage,
   AdminAnalyticsPage,
 } from './pages'
-import { AppLayout, RoleBasedWelcome } from './components'
+import { AppLayout, RoleBasedWelcome, ProtectedRoute } from './components'
 import ErrorBoundary from './components/ErrorBoundary'
 import { PerformanceMonitor } from './utils/performance'
 import { ErrorHandler } from './utils/errorHandler'
@@ -88,309 +88,387 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
 
-              {/* Public routes - no authentication required */}
+              {/* Student routes - require STUDENT role */}
               <Route
                 path="/student/dashboard"
                 element={
-                  <AppLayout>
-                    <StudentDashboard />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <StudentDashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/courses"
                 element={
-                  <AppLayout>
-                    <CoursesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <CoursesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/courses/:id"
                 element={
-                  <AppLayout>
-                    <CourseDetailPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <CourseDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/assignments"
                 element={
-                  <AppLayout>
-                    <AssignmentsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <AssignmentsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/assignments/:id"
                 element={
-                  <AppLayout>
-                    <AssignmentDetailPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <AssignmentDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/exams"
                 element={
-                  <AppLayout>
-                    <ExamsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <ExamsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/live-classes"
                 element={
-                  <AppLayout>
-                    <LiveClassesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <LiveClassesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/schedule"
                 element={
-                  <AppLayout>
-                    <SchedulePage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <SchedulePage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/student/messages"
                 element={
-                  <AppLayout>
-                    <MessagesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <MessagesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
-              {/* Teacher routes */}
+              
+              {/* Teacher routes - require INSTRUCTOR role */}
               <Route
                 path="/teacher/dashboard"
                 element={
-                  <AppLayout>
-                    <TeacherDashboard />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherDashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/courses"
                 element={
-                  <AppLayout>
-                    <TeacherCoursesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherCoursesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/courses/list"
                 element={
-                  <AppLayout>
-                    <TeacherCoursesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherCoursesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/courses/create"
                 element={
-                  <AppLayout>
-                    <CreateCoursePage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <CreateCoursePage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/courses/materials"
                 element={
-                  <AppLayout>
-                    <CourseMaterialsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <CourseMaterialsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/students"
                 element={
-                  <AppLayout>
-                    <StudentsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <StudentsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/assignments"
                 element={
-                  <AppLayout>
-                    <TeacherAssignmentsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherAssignmentsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/assignments/list"
                 element={
-                  <AppLayout>
-                    <AssignmentsListPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <AssignmentsListPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/assignments/create"
                 element={
-                  <AppLayout>
-                    <CreateAssignmentPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <CreateAssignmentPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/assignments/grading"
                 element={
-                  <AppLayout>
-                    <GradingPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <GradingPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/exams"
                 element={
-                  <AppLayout>
-                    <TeacherExamsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherExamsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/exams/list"
                 element={
-                  <AppLayout>
-                    <ExamsListPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <ExamsListPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/exams/create"
                 element={
-                  <AppLayout>
-                    <CreateExamPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <CreateExamPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/exams/results"
                 element={
-                  <AppLayout>
-                    <ExamResultsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <ExamResultsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/live-classes"
                 element={
-                  <AppLayout>
-                    <TeacherLiveClassesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherLiveClassesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/teacher/analytics"
                 element={
-                  <AppLayout>
-                    <AnalyticsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <AnalyticsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
-              {/* Admin routes */}
+              
+              {/* Admin routes - require ADMIN role */}
               <Route
                 path="/admin/dashboard"
                 element={
-                  <AppLayout>
-                    <AdminDashboard />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <AdminDashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/users"
                 element={
-                  <AppLayout>
-                    <UsersPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <UsersPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/users/students"
                 element={
-                  <AppLayout>
-                    <UsersPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <UsersPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/users/instructors"
                 element={
-                  <AppLayout>
-                    <UsersPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <UsersPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/users/admins"
                 element={
-                  <AppLayout>
-                    <UsersPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <UsersPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/courses"
                 element={
-                  <AppLayout>
-                    <AdminCoursesPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <AdminCoursesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/system"
                 element={
-                  <AppLayout>
-                    <SystemPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <SystemPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/system/config"
                 element={
-                  <AppLayout>
-                    <SystemPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <SystemPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/system/logs"
                 element={
-                  <AppLayout>
-                    <SystemPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <SystemPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/system/backup"
                 element={
-                  <AppLayout>
-                    <SystemPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <SystemPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin/analytics"
                 element={
-                  <AppLayout>
-                    <AdminAnalyticsPage />
-                  </AppLayout>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <AdminAnalyticsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
+              
+              {/* Profile page - available to all authenticated users */}
               <Route
                 path="/profile"
                 element={
-                  <AppLayout>
-                    <ProfilePage />
-                  </AppLayout>
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ProfilePage />
+                    </AppLayout>
+                  </ProtectedRoute>
                 }
               />
 
-              {/* Default redirect to student dashboard */}
-              <Route path="/" element={<Navigate to="/student/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
+              {/* Default redirect - will be handled by ProtectedRoute */}
+              <Route path="/" element={<ProtectedRoute />} />
+              <Route path="*" element={<ProtectedRoute />} />
             </Routes>
           </div>
         </Router>
