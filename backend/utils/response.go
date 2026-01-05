@@ -77,6 +77,24 @@ func NotFound(c *gin.Context, message string) {
 	Error(c, http.StatusNotFound, message)
 }
 
+// --- Backward-compatible aliases ---
+// Some handlers still use the older `*Error` naming. Keep these wrappers to avoid build breaks.
+func BadRequestError(c *gin.Context, message string) {
+	BadRequest(c, message)
+}
+
+func UnauthorizedError(c *gin.Context, message string) {
+	Unauthorized(c, message)
+}
+
+func ForbiddenError(c *gin.Context, message string) {
+	Forbidden(c, message)
+}
+
+func NotFoundError(c *gin.Context, message string) {
+	NotFound(c, message)
+}
+
 // InternalServerError 500错误
 func InternalServerError(c *gin.Context, message string) {
 	Error(c, http.StatusInternalServerError, message)
