@@ -20,7 +20,7 @@ func InitTelemetry(serviceName string) (func(context.Context) error, error) {
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
-			semconv.SchemaURL,
+			"", // 留空 SchemaURL，让 SDK 自行处理或默认为空，避免冲突
 			semconv.ServiceName(serviceName),
 		),
 	)

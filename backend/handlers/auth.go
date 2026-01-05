@@ -9,6 +9,8 @@ import (
 	"github.com/online-education-platform/backend/database"
 	"github.com/online-education-platform/backend/models"
 	"github.com/online-education-platform/backend/utils"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -51,11 +53,19 @@ type ChangePasswordRequest struct {
 
 // Login 用户登录
 func Login(c *gin.Context) {
+	// 1. Initialize Tracer
+	tracer := otel.Tracer("backend-service")
+	// 2. Start Span
+	_, span := tracer.Start(c.Request.Context(), "business.auth.login")
+	defer span.End()
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请求参数错误")
 		return
 	}
+
+	span.SetAttributes(attribute.String("auth.username", req.Username))
 
 	// 查询用户
 	var user models.User
@@ -69,19 +79,30 @@ func Login(c *gin.Context) {
 	)
 
 	if err == sql.ErrNoRows {
+		span.SetAttributes(
+			attribute.Bool("auth.success", false),
+			attribute.String("auth.fail_reason", "user_not_found"),
+		)
 		utils.Unauthorized(c, "用户名或密码错误")
 		return
 	}
 	if err != nil {
+		span.RecordError(err)
 		utils.InternalServerError(c, "服务器错误")
 		return
 	}
 
 	// 验证密码
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		span.SetAttributes(
+			attribute.Bool("auth.success", false),
+			attribute.String("auth.fail_reason", "wrong_password"),
+		)
 		utils.Unauthorized(c, "用户名或密码错误")
 		return
 	}
+
+	span.SetAttributes(attribute.Bool("auth.success", true))
 
 	// 生成JWT token
 	token, err := utils.GenerateToken(user.ID, user.Username, user.Role)
