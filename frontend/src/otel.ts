@@ -12,14 +12,8 @@ const provider = new WebTracerProvider({
   resource: resourceFromAttributes({
     [SemanticResourceAttributes.SERVICE_NAME]: 'frontend-service',
   }),
+  spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())],
 });
-
-// 添加Console Exporter (用于开发调试)
-if (typeof provider.addSpanProcessor === 'function') {
-  provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
-} else {
-  console.error('OTel Error: provider.addSpanProcessor is not a function', provider);
-}
 
 // 注册Provider
 // 使用默认的 context manager (StackContextManager)，不需要引入 Zone.js
