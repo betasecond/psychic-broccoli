@@ -31,6 +31,15 @@ func SuccessWithMessage(c *gin.Context, message string, data interface{}) {
 	})
 }
 
+// SuccessWithCode 成功响应带自定义状态码
+func SuccessWithCode(c *gin.Context, code int, data interface{}) {
+	c.JSON(code, Response{
+		Code:    0,
+		Message: "success",
+		Data:    data,
+	})
+}
+
 // Error 错误响应
 func Error(c *gin.Context, code int, message string) {
 	c.JSON(code, Response{

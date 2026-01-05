@@ -193,7 +193,20 @@ func main() {
 		// 讨论路由
 		discussions := v1.Group("/discussions")
 		{
-			discussions.GET("", handlers.GetDiscussions)
+			discussions.GET("", handlers.GetDiscussions)                   // 获取讨论列表
+			discussions.GET(":id", handlers.GetDiscussion)              // 获取单个讨论详情
+			discussions.POST("", handlers.CreateDiscussion)             // 创建新讨论
+			discussions.PUT(":id", handlers.UpdateDiscussion)           // 更新讨论
+			discussions.DELETE(":id", handlers.DeleteDiscussion)        // 删除讨论
+			discussions.GET(":id/replies", handlers.GetDiscussionReplies) // 获取讨论回复列表
+			discussions.POST(":id/replies", handlers.CreateDiscussionReply) // 回复讨论
+		}
+		
+		// 讨论回复路由
+		replies := v1.Group("/discussion-replies")
+		{
+			replies.PUT(":id", handlers.UpdateDiscussionReply)        // 更新回复
+			replies.DELETE(":id", handlers.DeleteDiscussionReply)     // 删除回复
 		}
 	}
 
