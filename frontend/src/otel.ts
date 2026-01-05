@@ -15,7 +15,11 @@ const provider = new WebTracerProvider({
 });
 
 // 添加Console Exporter (用于开发调试)
-provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+if (typeof provider.addSpanProcessor === 'function') {
+  provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+} else {
+  console.error('OTel Error: provider.addSpanProcessor is not a function', provider);
+}
 
 // 注册Provider
 // 使用默认的 context manager (StackContextManager)，不需要引入 Zone.js
