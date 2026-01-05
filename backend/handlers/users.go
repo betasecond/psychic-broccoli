@@ -13,6 +13,9 @@ import (
     "github.com/online-education-platform/backend/models"
     "github.com/online-education-platform/backend/utils"
     "github.com/xuri/excelize/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
     "golang.org/x/crypto/bcrypt"
 )
 
@@ -20,8 +23,17 @@ import (
 func ImportUsersFromExcel(c *gin.Context) {
 	role, _ := c.Get("role")
 
+	// 1. Initialize Tracer
+	tracer := otel.Tracer("backend-service")
+	// 2. Start Span
+	_, span := tracer.Start(c.Request.Context(), "business.file.upload")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("user.role", role.(string)))
+
 	// 只有管理员可以批量导入
 	if role != "ADMIN" {
+		span.SetStatus(codes.Error, "Forbidden")
 		utils.Forbidden(c, "只有管理员可以批量导入用户")
 		return
 	}
@@ -29,13 +41,23 @@ func ImportUsersFromExcel(c *gin.Context) {
 	// 获取上传的文件
 	file, err := c.FormFile("file")
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Missing file")
 		utils.BadRequest(c, "请上传Excel文件")
 		return
 	}
 
+	span.SetAttributes(
+		attribute.Int64("file.size", file.Size),
+		attribute.String("file.name", file.Filename),
+	)
+
     // 检查文件扩展名（仅支持 .xlsx）
     ext := filepath.Ext(file.Filename)
+	span.SetAttributes(attribute.String("file.extension", ext))
+
     if ext != ".xlsx" {
+		span.SetStatus(codes.Error, "Invalid extension")
         utils.BadRequest(c, "只支持Excel文件(.xlsx)")
         return
     }
@@ -43,6 +65,8 @@ func ImportUsersFromExcel(c *gin.Context) {
 	// 保存临时文件
 	tempPath := filepath.Join("database", "temp_upload.xlsx")
 	if err := c.SaveUploadedFile(file, tempPath); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Save failed")
 		utils.InternalServerError(c, "保存文件失败")
 		return
 	}
@@ -140,6 +164,17 @@ func ImportUsersFromExcel(c *gin.Context) {
 		}
 
 		successCount++
+	}
+
+	span.SetAttributes(
+		attribute.Int("import.success_count", successCount),
+		attribute.Int("import.error_count", errorCount),
+	)
+
+	if errorCount > 0 {
+		span.AddEvent("import_completed_with_errors")
+	} else {
+		span.AddEvent("import_completed_successfully")
 	}
 
 	utils.Success(c, gin.H{
