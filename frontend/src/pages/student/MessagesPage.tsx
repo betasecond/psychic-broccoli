@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Card, Row, Col, Button, Typography, Space, List, Tabs, Badge, Avatar, message as antdMessage } from 'antd';
 import { MessageOutlined, BellOutlined, MailOutlined, CommentOutlined, LikeOutlined, UserAddOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '../../store';
+import { useNavigate } from 'react-router-dom'
 import {
   fetchMessagesAsync,
   markMessageStatusAsync,
@@ -22,6 +23,7 @@ const { TabPane } = Tabs;
 
 const MessagesPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate()
   const messages = useAppSelector(selectMessages);
   const notifications = useAppSelector(selectNotifications);
   const discussions = useAppSelector(selectDiscussions);
@@ -227,7 +229,7 @@ const MessagesPage: React.FC = () => {
                     <List.Item
                       key={item.id}
                       actions={[
-                        <Button type="link" key={`view-${item.id}`}>
+                        <Button type="link" key={`view-${item.id}`} onClick={() => navigate(`/student/discussions/${item.id}`)}>
                           <Space>
                             <CommentOutlined />
                             参与讨论

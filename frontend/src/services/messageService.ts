@@ -35,6 +35,18 @@ export interface Discussion {
   createdAt: string
 }
 
+// Backend discussion shape (from /api/v1/discussions)
+interface BackendDiscussion {
+  id: number
+  title: string
+  courseTitle?: string
+  authorName?: string
+  replies: number
+  lastReplyAt?: string | null
+  status: string
+  createdAt: string
+}
+
 // 标记消息状态请求
 export interface MarkMessageStatusRequest {
   status: 'read' | 'unread'
@@ -88,7 +100,20 @@ export const messageService = {
   // 获取课程讨论列表
   getDiscussions: async (): Promise<Discussion[]> => {
     try {
-      return await api.get('/discussions')
+      const data = await api.get('/discussions')
+      const discussions = (Array.isArray(data) ? data : []) as BackendDiscussion[]
+
+      return discussions.map(d => ({
+        id: d.id,
+        title: d.title,
+        course: d.courseTitle || '未知课程',
+        author: d.authorName || '未知用户',
+        replies: d.replies ?? 0,
+        lastReply: d.lastReplyAt || d.createdAt,
+        // UI used to treat "hot" specially; keep a simple heuristic.
+        status: (d.replies ?? 0) >= 10 ? 'hot' : d.status,
+        createdAt: d.createdAt,
+      }))
     } catch (error) {
       console.error('获取课程讨论列表失败:', error)
       throw error

@@ -20,6 +20,8 @@ import {
   LiveClassesPage,
   SchedulePage,
   MessagesPage,
+  DiscussionsPage,
+  DiscussionDetailPage,
   // Teacher pages
   TeacherCoursesPage,
   StudentsPage,
@@ -175,6 +177,26 @@ function App() {
                   <ProtectedRoute requiredRole="STUDENT">
                     <AppLayout>
                       <MessagesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/discussions"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <DiscussionsPage basePath="/student/discussions" />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/discussions/:id"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <DiscussionDetailPage backTo="/student/discussions" />
                     </AppLayout>
                   </ProtectedRoute>
                 }
@@ -337,6 +359,27 @@ function App() {
                   <ProtectedRoute requiredRole="INSTRUCTOR">
                     <AppLayout>
                       <AnalyticsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/teacher/discussions"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <DiscussionsPage basePath="/teacher/discussions" />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/discussions/:id"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <DiscussionDetailPage backTo="/teacher/discussions" />
                     </AppLayout>
                   </ProtectedRoute>
                 }

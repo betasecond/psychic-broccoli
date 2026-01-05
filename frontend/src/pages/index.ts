@@ -11,6 +11,8 @@ export { default as CourseDetailPage } from './student/CourseDetailPage'
 export { default as LiveClassesPage } from './student/LiveClassesPage'
 export { default as SchedulePage } from './student/SchedulePage'
 export { default as MessagesPage } from './student/MessagesPage'
+export { default as DiscussionsPage } from './shared/DiscussionsPage'
+export { default as DiscussionDetailPage } from './shared/DiscussionDetailPage'
 
 // 教师相关页面
 export { default as TeacherCoursesPage } from './teacher/CoursesPage'
