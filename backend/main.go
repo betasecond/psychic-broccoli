@@ -191,22 +191,31 @@ func main() {
 		}
 
 		// 讨论路由
+		// Note: Gin routes must include a leading "/" for params, otherwise you'll register "/discussions:id".
 		discussions := v1.Group("/discussions")
 		{
-			discussions.GET("", handlers.GetDiscussions)                   // 获取讨论列表
-			discussions.GET(":id", handlers.GetDiscussion)              // 获取单个讨论详情
-			discussions.POST("", handlers.CreateDiscussion)             // 创建新讨论
-			discussions.PUT(":id", handlers.UpdateDiscussion)           // 更新讨论
-			discussions.DELETE(":id", handlers.DeleteDiscussion)        // 删除讨论
-			discussions.GET(":id/replies", handlers.GetDiscussionReplies) // 获取讨论回复列表
-			discussions.POST(":id/replies", handlers.CreateDiscussionReply) // 回复讨论
+			// 公开读取接口
+			discussions.GET("", handlers.GetDiscussions)              // 获取讨论列表
+			discussions.GET("/:id", handlers.GetDiscussion)           // 获取单个讨论详情
+			discussions.GET("/:id/replies", handlers.GetDiscussionReplies) // 获取讨论回复列表
+
+			// 需要认证的写操作
+			authenticated := discussions.Group("")
+			authenticated.Use(middleware.AuthMiddleware())
+			{
+				authenticated.POST("", handlers.CreateDiscussion)            // 创建新讨论
+				authenticated.PUT("/:id", handlers.UpdateDiscussion)         // 更新讨论
+				authenticated.DELETE("/:id", handlers.DeleteDiscussion)      // 删除讨论
+				authenticated.POST("/:id/replies", handlers.CreateDiscussionReply) // 回复讨论
+			}
 		}
-		
-		// 讨论回复路由
+
+		// 讨论回复路由（需要认证）
 		replies := v1.Group("/discussion-replies")
+		replies.Use(middleware.AuthMiddleware())
 		{
-			replies.PUT(":id", handlers.UpdateDiscussionReply)        // 更新回复
-			replies.DELETE(":id", handlers.DeleteDiscussionReply)     // 删除回复
+			replies.PUT("/:id", handlers.UpdateDiscussionReply)    // 更新回复
+			replies.DELETE("/:id", handlers.DeleteDiscussionReply) // 删除回复
 		}
 	}
 
