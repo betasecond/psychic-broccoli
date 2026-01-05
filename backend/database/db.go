@@ -8,7 +8,7 @@ import (
 	"github.com/XSAM/otelsql"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/online-education-platform/backend/utils"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 	"go.uber.org/zap"
 )
 
