@@ -115,3 +115,31 @@
 
 ---
 
+### Docker 健康检查工具修复
+**时间**: 2025-01-07  
+**提交**: `abfd6aa`
+
+**任务描述**:  
+修复 Docker 镜像中健康检查工具缺失的问题，确保健康检查功能正常工作。
+
+**修改文件**:
+- `backend/Dockerfile` - 添加 wget 包安装
+- `frontend/Dockerfile` - 添加 wget 包安装
+
+**主要变更**:
+1. **问题发现**:
+   - Dockerfile 中使用了 `wget` 进行健康检查
+   - 但 Alpine 镜像默认不包含 `wget` 工具
+   - 导致健康检查命令执行失败
+
+2. **修复方案**:
+   - 在 `backend/Dockerfile` 的运行时镜像中添加 `wget` 包安装（`RUN apk add --no-cache ca-certificates tzdata wget`）
+   - 在 `frontend/Dockerfile` 的 Nginx 镜像中添加 `wget` 包安装（`RUN apk add --no-cache wget`）
+   - 确保健康检查命令能够正常执行
+
+3. **影响**:
+   - 修复后，Docker Compose 的健康检查功能可以正常工作
+   - 容器状态监控和自动重启功能可以正常使用
+
+---
+
