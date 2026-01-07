@@ -23,8 +23,18 @@ interface FeatureCardProps {
   color: string
 }
 
+// Helper function to convert hex color to rgba with opacity
+const hexToRgba = (hex: string, opacity: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`
+}
+
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, path, color }) => {
   const navigate = useNavigate()
+  const lightBgColor = hexToRgba(color, 0.08)
+  const hoverBgColor = hexToRgba(color, 0.15)
 
   return (
     <Card
@@ -45,7 +55,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, pat
             width: '100px',
             height: '100px',
             borderRadius: '50%',
-            backgroundColor: `${color}15`,
+            backgroundColor: lightBgColor,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -56,11 +66,11 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, pat
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)'
-            e.currentTarget.style.backgroundColor = `${color}25`
+            e.currentTarget.style.backgroundColor = hoverBgColor
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.backgroundColor = `${color}15`
+            e.currentTarget.style.backgroundColor = lightBgColor
           }}
         >
           {icon}
