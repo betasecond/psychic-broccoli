@@ -45,7 +45,7 @@ Start-Sleep -Seconds 2
 $newProcess = Get-Process -Name "server" -ErrorAction SilentlyContinue
 if ($newProcess) {
     Write-Host "   ✅ 服务器已启动 (PID: $($newProcess.Id))" -ForegroundColor Green
-    Write-Host "   📍 后端地址: http://localhost:8081" -ForegroundColor Cyan
+    Write-Host "   📍 后端地址: http://localhost:8080" -ForegroundColor Cyan
 } else {
     Write-Host "   ❌ 服务器启动失败" -ForegroundColor Red
 }
