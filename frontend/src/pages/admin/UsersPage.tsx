@@ -263,11 +263,13 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
+      width: 200,
+      fixed: 'right' as const,
       render: (_, record: User) => (
-        <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
-          <Button type="link" icon={<MailOutlined />}>发送消息</Button>
-          <Button type="link" icon={<EditOutlined />}>编辑</Button>
+        <Space size="small" wrap>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看</Button>
+          <Button type="link" size="small" icon={<MailOutlined />}>消息</Button>
+          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
         </Space>
       ),
     },
@@ -314,11 +316,13 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
+      width: 200,
+      fixed: 'right' as const,
       render: (_, record: User) => (
-        <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
-          <Button type="link" icon={<MailOutlined />}>发送消息</Button>
-          <Button type="link" icon={<EditOutlined />}>编辑</Button>
+        <Space size="small" wrap>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看</Button>
+          <Button type="link" size="small" icon={<MailOutlined />}>消息</Button>
+          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
         </Space>
       ),
     },
@@ -376,11 +380,13 @@ const UsersPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
+      width: 200,
+      fixed: 'right' as const,
       render: (_, record: User) => (
-        <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看资料</Button>
-          <Button type="link" icon={<MailOutlined />}>发送消息</Button>
-          <Button type="link" icon={<EditOutlined />}>编辑</Button>
+        <Space size="small" wrap>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewProfile(record.userId)}>查看</Button>
+          <Button type="link" size="small" icon={<MailOutlined />}>消息</Button>
+          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
         </Space>
       ),
     },
@@ -435,8 +441,8 @@ const UsersPage: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
         <Col span={24}>
           <Card>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Space>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <Space wrap>
                 <Button type="primary">新增用户</Button>
                 <Button 
                   icon={<UploadOutlined />} 
@@ -451,7 +457,7 @@ const UsersPage: React.FC = () => {
                   下载模板
                 </Button>
               </Space>
-              <Space>
+              <Space wrap>
                 <Button 
                   icon={<SearchOutlined />}
                   onClick={() => setSearchModalVisible(true)}
@@ -473,6 +479,7 @@ const UsersPage: React.FC = () => {
                   columns={studentColumns} 
                   rowKey="userId"
                   loading={loading || searching}
+                  scroll={{ x: 1200 }}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
@@ -487,6 +494,7 @@ const UsersPage: React.FC = () => {
                   columns={instructorColumns} 
                   rowKey="userId"
                   loading={loading || searching}
+                  scroll={{ x: 1000 }}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
@@ -501,6 +509,7 @@ const UsersPage: React.FC = () => {
                   columns={adminColumns} 
                   rowKey="userId"
                   loading={loading || searching}
+                  scroll={{ x: 1200 }}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
