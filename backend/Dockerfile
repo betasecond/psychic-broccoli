@@ -40,8 +40,8 @@ RUN set -eu; \
 # --- Stage 2: Production runtime image ---
 FROM alpine:3.20
 
-# Install ca-certificates for HTTPS and timezone data
-RUN apk add --no-cache ca-certificates tzdata
+# Install ca-certificates for HTTPS, timezone data, and wget for healthcheck
+RUN apk add --no-cache ca-certificates tzdata wget
 
 WORKDIR /app
 

@@ -24,6 +24,9 @@ RUN npm run build
 # --- Stage 2: Production runtime with Nginx ---
 FROM nginx:1.27-alpine
 
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
 # Remove default nginx static assets
 RUN rm -rf /usr/share/nginx/html/*
 
