@@ -280,17 +280,33 @@ func GetUsers(c *gin.Context) {
 
 	// 获取角色筛选参数
 	roleFilter := c.Query("role")
+	// 获取搜索参数
+	search := c.Query("search")
 
 	// 构建查询语句
 	query := `SELECT id, username, email, avatar_url, full_name, phone, gender, bio, role, created_at, updated_at FROM users`
 	countQuery := `SELECT COUNT(*) FROM users`
 	args := []interface{}{}
+	whereConditions := []string{}
 
 	// 添加角色筛选条件
 	if roleFilter != "" {
-		query += ` WHERE role = ?`
-		countQuery += ` WHERE role = ?`
+		whereConditions = append(whereConditions, `role = ?`)
 		args = append(args, roleFilter)
+	}
+
+	// 添加搜索条件
+	if search != "" {
+		searchPattern := "%" + search + "%"
+		whereConditions = append(whereConditions, `(username LIKE ? OR email LIKE ? OR full_name LIKE ?)`)
+		args = append(args, searchPattern, searchPattern, searchPattern)
+	}
+
+	// 组合WHERE子句
+	if len(whereConditions) > 0 {
+		whereClause := " WHERE " + strings.Join(whereConditions, " AND ")
+		query += whereClause
+		countQuery += whereClause
 	}
 
 	// 添加分页

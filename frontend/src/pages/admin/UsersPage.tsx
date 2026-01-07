@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar, Modal, Upload, message } from 'antd';
+import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic, Avatar, Modal, Upload, message, Input } from 'antd';
 import { UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, MailOutlined, CrownOutlined, BookOutlined, CalendarOutlined, UploadOutlined, InboxOutlined, EyeOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { userService, type User } from '../../services/userService';
@@ -19,6 +19,12 @@ const UsersPage: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('students');
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [filteredStudents, setFilteredStudents] = useState<User[] | null>(null);
+  const [filteredInstructors, setFilteredInstructors] = useState<User[] | null>(null);
+  const [filteredAdmins, setFilteredAdmins] = useState<User[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   // 查看用户资料
   const handleViewProfile = (userId: number) => {
@@ -53,7 +59,68 @@ const UsersPage: React.FC = () => {
   // 切换标签时刷新数据
   const handleTabChange = (key: string) => {
     setActiveTab(key);
+    // 切换标签时清除搜索过滤
+    setFilteredStudents(null);
+    setFilteredInstructors(null);
+    setFilteredAdmins(null);
+    setSearchKeyword('');
     fetchUsers();
+  };
+
+  // 执行搜索
+  const handleSearch = async () => {
+    if (!searchKeyword.trim()) {
+      message.warning('请输入搜索关键词');
+      return;
+    }
+
+    setSearching(true);
+    try {
+      // 根据当前标签页确定角色
+      let role: string | undefined;
+      if (activeTab === 'students') {
+        role = 'STUDENT';
+      } else if (activeTab === 'instructors') {
+        role = 'INSTRUCTOR';
+      } else if (activeTab === 'admins') {
+        role = 'ADMIN';
+      }
+
+      // 调用搜索API
+      const response = await userService.getUsers({ 
+        page: 1, 
+        pageSize: 1000, 
+        role,
+        search: searchKeyword.trim()
+      });
+
+      // 根据当前标签页更新过滤后的列表
+      if (activeTab === 'students') {
+        setFilteredStudents(response.users);
+      } else if (activeTab === 'instructors') {
+        setFilteredInstructors(response.users);
+      } else if (activeTab === 'admins') {
+        setFilteredAdmins(response.users);
+      }
+
+      message.success(`找到 ${response.users.length} 个匹配的用户`);
+      setSearchModalVisible(false);
+    } catch (error) {
+      message.error('搜索失败');
+      console.error('Failed to search users:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // 清除搜索
+  const handleClearSearch = () => {
+    setSearchKeyword('');
+    setFilteredStudents(null);
+    setFilteredInstructors(null);
+    setFilteredAdmins(null);
+    setSearchModalVisible(false);
+    message.info('已清除搜索条件');
   };
 
   // 下载导入模板
@@ -385,7 +452,12 @@ const UsersPage: React.FC = () => {
                 </Button>
               </Space>
               <Space>
-                <Button icon={<SearchOutlined />}>搜索用户</Button>
+                <Button 
+                  icon={<SearchOutlined />}
+                  onClick={() => setSearchModalVisible(true)}
+                >
+                  搜索用户
+                </Button>
                 <Button>按角色筛选</Button>
               </Space>
             </div>
@@ -397,43 +469,43 @@ const UsersPage: React.FC = () => {
             >
               <TabPane tab="学生管理" key="students">
                 <Table 
-                  dataSource={students} 
+                  dataSource={filteredStudents !== null ? filteredStudents : students} 
                   columns={studentColumns} 
                   rowKey="userId"
-                  loading={loading}
+                  loading={loading || searching}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    showTotal: (total) => `共 ${total} 名学生`
+                    showTotal: (total) => `共 ${total} 名学生${filteredStudents !== null ? '（已筛选）' : ''}`
                   }}
                 />
               </TabPane>
               <TabPane tab="教师管理" key="instructors">
                 <Table 
-                  dataSource={instructors} 
+                  dataSource={filteredInstructors !== null ? filteredInstructors : instructors} 
                   columns={instructorColumns} 
                   rowKey="userId"
-                  loading={loading}
+                  loading={loading || searching}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    showTotal: (total) => `共 ${total} 名教师`
+                    showTotal: (total) => `共 ${total} 名教师${filteredInstructors !== null ? '（已筛选）' : ''}`
                   }}
                 />
               </TabPane>
               <TabPane tab="管理员管理" key="admins">
                 <Table 
-                  dataSource={admins} 
+                  dataSource={filteredAdmins !== null ? filteredAdmins : admins} 
                   columns={adminColumns} 
                   rowKey="userId"
-                  loading={loading}
+                  loading={loading || searching}
                   pagination={{
                     pageSize: 10,
                     showSizeChanger: true,
                     showQuickJumper: true,
-                    showTotal: (total) => `共 ${total} 名管理员`
+                    showTotal: (total) => `共 ${total} 名管理员${filteredAdmins !== null ? '（已筛选）' : ''}`
                   }}
                 />
               </TabPane>
@@ -643,6 +715,57 @@ const UsersPage: React.FC = () => {
               <li>用户名不能重复</li>
               <li>请严格按照模板格式填写</li>
             </ul>
+          </div>
+        </Space>
+      </Modal>
+
+      {/* 搜索用户Modal */}
+      <Modal
+        title="搜索用户"
+        open={searchModalVisible}
+        onOk={handleSearch}
+        onCancel={() => {
+          setSearchModalVisible(false);
+          setSearchKeyword('');
+        }}
+        okText="搜索"
+        cancelText="取消"
+        confirmLoading={searching}
+        footer={[
+          <Button key="clear" onClick={handleClearSearch}>
+            清除搜索
+          </Button>,
+          <Button key="cancel" onClick={() => {
+            setSearchModalVisible(false);
+            setSearchKeyword('');
+          }}>
+            取消
+          </Button>,
+          <Button key="search" type="primary" loading={searching} onClick={handleSearch}>
+            搜索
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div>
+            <Text strong>搜索关键词：</Text>
+            <Input
+              placeholder="请输入用户名、邮箱或姓名"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onPressEnter={handleSearch}
+              style={{ marginTop: '8px' }}
+              allowClear
+            />
+          </div>
+          <div style={{ padding: '12px', backgroundColor: '#f0f2f5', borderRadius: '4px' }}>
+            <Text type="secondary">
+              当前搜索范围：{activeTab === 'students' ? '学生' : activeTab === 'instructors' ? '教师' : '管理员'}
+            </Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              搜索将在当前标签页的用户中进行，支持按用户名、邮箱或姓名模糊匹配
+            </Text>
           </div>
         </Space>
       </Modal>
