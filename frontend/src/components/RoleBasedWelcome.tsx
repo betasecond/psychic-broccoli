@@ -29,11 +29,40 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, pat
   return (
     <Card
       hoverable
-      style={{ height: '100%' }}
+      style={{ 
+        height: '100%',
+        borderRadius: '20px',
+        textAlign: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+      }}
+      bodyStyle={{ padding: '32px 24px' }}
       onClick={() => navigate(path)}
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <div style={{ fontSize: '32px', color, textAlign: 'center' }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div 
+          style={{ 
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
+            backgroundColor: `${color}15`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto',
+            fontSize: '40px',
+            color: color,
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.backgroundColor = `${color}25`
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.backgroundColor = `${color}15`
+          }}
+        >
           {icon}
         </div>
         <Title level={4} style={{ textAlign: 'center', margin: 0 }}>
