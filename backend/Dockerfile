@@ -51,12 +51,13 @@ COPY --from=builder /app/server .
 # Copy database schema (needed for InitDB to read schema.sql)
 COPY --from=builder /app/database/schema.sql ./database/
 
-# Copy public static files (assignments attachments, etc.)
-COPY --from=builder /app/public ./public
-
 # Create data directory for SQLite persistence
-# Create uploads directory for user-uploaded files (will be mounted as volume)
-RUN mkdir -p /data /app/public/uploads
+# Create upload directories for user-uploaded files (assignments, avatars, covers, materials)
+RUN mkdir -p /data \
+    /app/public/assignments \
+    /app/public/avatars \
+    /app/public/covers \
+    /app/public/materials
 
 # Environment variables with defaults
 ENV SERVER_PORT=8080
