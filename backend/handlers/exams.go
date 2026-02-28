@@ -410,6 +410,7 @@ func SubmitExam(c *gin.Context) {
 
 	totalScore := 0.0
 	for _, answer := range req.Answers {
+		_, qSpan := tracer.Start(ctx, "business.grading.question")
 		// 获取题目信息，同时验证题目属于当前考试（防止注入其他考试的题目）
 		var question models.ExamQuestion
 		err := database.DB.QueryRow(`
