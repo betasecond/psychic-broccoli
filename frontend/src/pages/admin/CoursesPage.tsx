@@ -1,53 +1,52 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tag, Statistic, Avatar } from 'antd';
-import { BookOutlined, UserOutlined, TeamOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CheckCircleOutlined, ClockCircleOutlined, BarChartOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Card, Row, Col, Typography, Space, Table, Tag, Statistic, Avatar, Spin, Progress } from 'antd';
+import { BookOutlined, UserOutlined, TeamOutlined, CheckCircleOutlined, ClockCircleOutlined, BarChartOutlined } from '@ant-design/icons';
+import { courseService } from '../../services/courseService';
 
 const { Title, Text } = Typography;
 
+const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  PUBLISHED: { label: '已发布', color: 'blue' },
+  DRAFT:     { label: '草稿',   color: 'orange' },
+  ARCHIVED:  { label: '已归档', color: 'default' },
+};
+
 const AdminCoursesPage: React.FC = () => {
-  // 模拟课程数据
-  const courses = [
-    {
-      id: '1',
-      title: 'React 深入浅出',
-      instructor: '张老师',
-      students: 156,
-      category: '前端开发',
-      status: '进行中',
-      progress: 75,
-      rating: 4.8,
-    },
-    {
-      id: '2',
-      title: 'TypeScript 实战',
-      instructor: '李老师',
-      students: 98,
-      category: '编程语言',
-      status: '进行中',
-      progress: 60,
-      rating: 4.9,
-    },
-    {
-      id: '3',
-      title: '前端开发基础',
-      instructor: '王老师',
-      students: 203,
-      category: '前端开发',
-      status: '已完成',
-      progress: 100,
-      rating: 4.7,
-    },
-    {
-      id: '4',
-      title: 'Vue 3 实战课程',
-      instructor: '赵老师',
-      students: 87,
-      category: '前端开发',
-      status: '待开课',
-      progress: 0,
-      rating: 4.6,
-    },
-  ];
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await courseService.getCourses({}) as any;
+        setCourses(res?.courses || []);
+      } catch {
+        // 静默失败
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const published  = courses.filter((c) => c.status === 'PUBLISHED').length;
+  const draft      = courses.filter((c) => c.status === 'DRAFT').length;
+  const archived   = courses.filter((c) => c.status === 'ARCHIVED').length;
+
+  // 按分类统计
+  const categoryMap: Record<string, number> = {};
+  courses.forEach((c) => {
+    const cat = c.categoryName || '未分类';
+    categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+  });
+  const categories = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const maxCatCount = categories[0]?.[1] || 1;
+
+  // 最多学生课程（按 totalStudents 排序，若无则按标题）
+  const topCourses = [...courses]
+    .sort((a, b) => (b.studentCount || 0) - (a.studentCount || 0))
+    .slice(0, 3);
 
   const columns = [
     {
@@ -58,95 +57,35 @@ const AdminCoursesPage: React.FC = () => {
     },
     {
       title: '授课教师',
-      dataIndex: 'instructor',
-      key: 'instructor',
-      render: (instructor: string) => (
+      dataIndex: 'instructorName',
+      key: 'instructorName',
+      render: (name: string) => (
         <Space>
           <Avatar size="small" icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
-          <span>{instructor}</span>
+          <span>{name || '-'}</span>
         </Space>
       ),
     },
     {
       title: '分类',
-      dataIndex: 'category',
-      key: 'category',
-      render: (category: string) => (
-        <Tag color="blue">{category}</Tag>
-      ),
-    },
-    {
-      title: '学生数',
-      dataIndex: 'students',
-      key: 'students',
-      render: (students: number) => (
-        <Space>
-          <TeamOutlined />
-          <span>{students}</span>
-        </Space>
-      ),
+      dataIndex: 'categoryName',
+      key: 'categoryName',
+      render: (cat: string) => <Tag color="blue">{cat || '未分类'}</Tag>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        let color = 'default';
-        switch(status) {
-          case '进行中':
-            color = 'blue';
-            break;
-          case '已完成':
-            color = 'green';
-            break;
-          case '待开课':
-            color = 'orange';
-            break;
-          default:
-            color = 'default';
-        }
-        return <Tag color={color}>{status}</Tag>;
+        const s = STATUS_MAP[status] || { label: status, color: 'default' };
+        return <Tag color={s.color}>{s.label}</Tag>;
       },
     },
     {
-      title: '进度',
-      key: 'progress',
-      render: (record: any) => (
-        <div>
-          <div>{record.progress}%</div>
-          <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-            <div 
-              style={{ 
-                width: `${record.progress}%`, 
-                height: '8px', 
-                backgroundColor: record.progress === 100 ? '#52c41a' : record.progress > 50 ? '#1890ff' : '#fa8c16',
-                borderRadius: '4px'
-              }}
-            />
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '评分',
-      key: 'rating',
-      render: (record: any) => (
-        <Space>
-          <span style={{ color: '#faad14' }}>★</span>
-          <span>{record.rating}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: () => (
-        <Space size="middle">
-          <Button type="link">查看</Button>
-          <Button type="link">编辑</Button>
-          <Button type="link">数据</Button>
-        </Space>
-      ),
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (v: string) => v ? new Date(v).toLocaleDateString('zh-CN') : '-',
     },
   ];
 
@@ -160,241 +99,111 @@ const AdminCoursesPage: React.FC = () => {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={6}>
           <Card>
-            <Statistic
-              title="总课程数"
-              value={128}
-              prefix={<BookOutlined />}
-            />
+            <Statistic title="总课程数" value={courses.length} prefix={<BookOutlined />} loading={loading} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
-            <Statistic
-              title="进行中课程"
-              value={89}
-              prefix={<ClockCircleOutlined />}
-            />
+            <Statistic title="已发布" value={published} prefix={<CheckCircleOutlined />} loading={loading} valueStyle={{ color: '#1890ff' }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
-            <Statistic
-              title="学生总数"
-              value={4589}
-              prefix={<TeamOutlined />}
-            />
+            <Statistic title="草稿" value={draft} prefix={<ClockCircleOutlined />} loading={loading} valueStyle={{ color: '#fa8c16' }} />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
-            <Statistic
-              title="平均评分"
-              value={4.6}
-              precision={1}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
+            <Statistic title="已归档" value={archived} prefix={<BarChartOutlined />} loading={loading} valueStyle={{ color: '#8c8c8c' }} />
           </Card>
         </Col>
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
         <Col span={24}>
-          <Card>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Space>
-                <Button type="primary">新增课程</Button>
-                <Button icon={<EditOutlined />}>批量操作</Button>
-              </Space>
-              <Space>
-                <Button icon={<SearchOutlined />}>搜索课程</Button>
-                <Button>按状态筛选</Button>
-              </Space>
-            </div>
-            
-            <Table 
-              dataSource={courses} 
-              columns={columns} 
+          <Card title={`课程列表（共 ${courses.length} 门）`}>
+            <Table
+              dataSource={courses}
+              columns={columns}
               rowKey="id"
-              pagination={{
-                pageSize: 10,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 门课程`
-              }}
+              loading={loading}
+              pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 门课程` }}
+              locale={{ emptyText: loading ? ' ' : '暂无课程数据' }}
             />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card title="课程分布统计">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>前端开发</Text>
-                  <Text strong>45</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '35%', 
-                      height: '8px', 
-                      backgroundColor: '#1890ff',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>后端开发</Text>
-                  <Text strong>32</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '25%', 
-                      height: '8px', 
-                      backgroundColor: '#52c41a',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>编程语言</Text>
-                  <Text strong>28</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '22%', 
-                      height: '8px', 
-                      backgroundColor: '#fa8c16',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>设计</Text>
-                  <Text strong>23</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '18%', 
-                      height: '8px', 
-                      backgroundColor: '#722ed1',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="课程状态统计">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>进行中</Text>
-                  <Text strong type="primary">89</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '70%', 
-                      height: '8px', 
-                      backgroundColor: '#1890ff',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>已完成</Text>
-                  <Text strong type="success">35</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '27%', 
-                      height: '8px', 
-                      backgroundColor: '#52c41a',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>待开课</Text>
-                  <Text strong type="warning">4</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '3%', 
-                      height: '8px', 
-                      backgroundColor: '#fa8c16',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="热门课程">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div style={{ padding: '12px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <BarChartOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-                  <Text strong>最受好评课程</Text>
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <Text>React 深入浅出 (4.9分)</Text>
-                </div>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <TeamOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
-                  <Text strong>最多学生课程</Text>
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <Text>前端开发基础 (203人)</Text>
-                </div>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <ClockCircleOutlined style={{ color: '#fa8c16', marginRight: '8px' }} />
-                  <Text strong>最新开课</Text>
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <Text>Vue 3 实战课程</Text>
-                </div>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+      {courses.length > 0 && (
+        <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+          <Col xs={24} md={12}>
+            <Card title="课程分类分布">
+              {loading ? <Spin /> : (
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {categories.length > 0 ? categories.map(([cat, count]) => (
+                    <div key={cat}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text>{cat}</Text>
+                        <Text strong>{count} 门</Text>
+                      </div>
+                      <Progress percent={Math.round((count / maxCatCount) * 100)} showInfo={false} strokeColor="#1890ff" />
+                    </div>
+                  )) : <Text type="secondary">暂无分类数据</Text>}
+                </Space>
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Card title="课程状态分布">
+              {loading ? <Spin /> : (
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {[
+                    { label: '已发布', count: published, color: '#1890ff' },
+                    { label: '草稿',   count: draft,     color: '#fa8c16' },
+                    { label: '已归档', count: archived,  color: '#8c8c8c' },
+                  ].map(({ label, count, color }) => (
+                    <div key={label}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text>{label}</Text>
+                        <Text strong>{count} 门</Text>
+                      </div>
+                      <Progress
+                        percent={courses.length > 0 ? Math.round((count / courses.length) * 100) : 0}
+                        showInfo={false}
+                        strokeColor={color}
+                      />
+                    </div>
+                  ))}
+                </Space>
+              )}
+            </Card>
+          </Col>
+
+          {topCourses.length > 0 && (
+            <Col xs={24}>
+              <Card title="最近课程">
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  {topCourses.map((c, i) => (
+                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < topCourses.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <Space>
+                        <TeamOutlined style={{ color: '#1890ff' }} />
+                        <Text strong>{c.title}</Text>
+                      </Space>
+                      <Space>
+                        <Tag color={(STATUS_MAP[c.status] || {}).color || 'default'}>
+                          {(STATUS_MAP[c.status] || {}).label || c.status}
+                        </Tag>
+                        <Text type="secondary">{c.instructorName}</Text>
+                      </Space>
+                    </div>
+                  ))}
+                </Space>
+              </Card>
+            </Col>
+          )}
+        </Row>
+      )}
     </div>
   );
 };

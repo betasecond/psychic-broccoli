@@ -1,0 +1,101 @@
+.live-stream-page {
+  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.header-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-info h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.viewers-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.control-card,
+.chat-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.control-card ol {
+  padding-left: 20px;
+}
+
+.control-card ol li {
+  margin-bottom: 8px;
+  line-height: 1.8;
+}
+
+.ended-info {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.chat-card {
+  height: 700px;
+}
+
+.chat-card .ant-card-body {
+  height: calc(100% - 57px);
+  padding: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 992px) {
+  .chat-card {
+    margin-top: 16px;
+    height: 500px;
+  }
+}
+
+@media (max-width: 768px) {
+  .live-stream-page {
+    padding: 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .header-info h2 {
+    font-size: 18px;
+  }
+}

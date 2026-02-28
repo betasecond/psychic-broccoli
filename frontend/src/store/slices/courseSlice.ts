@@ -37,7 +37,7 @@ export const fetchCourses = createAsyncThunk(
   'course/fetchCourses',
   async (params?: { categoryId?: number; page?: number; pageSize?: number }) => {
     const response = await courseService.getCourses(params)
-    return response.data.courses
+    return response.courses
   }
 )
 
@@ -45,7 +45,7 @@ export const fetchMyCourses = createAsyncThunk(
   'course/fetchMyCourses',
   async () => {
     const response = await courseService.getMyCourses()
-    return response.data.courses
+    return response.courses
   }
 )
 
@@ -53,7 +53,7 @@ export const fetchCourse = createAsyncThunk(
   'course/fetchCourse',
   async (id: number) => {
     const response = await courseService.getCourse(id)
-    return response.data
+    return response
   }
 )
 
@@ -61,7 +61,7 @@ export const createCourse = createAsyncThunk(
   'course/createCourse',
   async (data: CreateCourseRequest) => {
     const response = await courseService.createCourse(data)
-    return response.data
+    return response
   }
 )
 
@@ -93,7 +93,8 @@ export const fetchChapters = createAsyncThunk(
   'course/fetchChapters',
   async (courseId: number) => {
     const response = await courseService.getChapters(courseId)
-    return response.data.chapters
+    // 处理不同的响应格式
+    return Array.isArray(response) ? response : response.chapters
   }
 )
 
@@ -101,7 +102,7 @@ export const createChapter = createAsyncThunk(
   'course/createChapter',
   async ({ courseId, data }: { courseId: number; data: CreateChapterRequest }) => {
     const response = await courseService.createChapter(courseId, data)
-    return response.data
+    return response
   }
 )
 
@@ -125,7 +126,7 @@ export const fetchStatistics = createAsyncThunk(
   'course/fetchStatistics',
   async (id: number) => {
     const response = await courseService.getCourseStatistics(id)
-    return response.data
+    return response
   }
 )
 

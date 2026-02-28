@@ -72,7 +72,7 @@ const MessagesPage: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <MessageOutlined style={{ fontSize: '32px', color: '#1890ff', marginBottom: '8px' }} />
               <Title level={4}>总消息</Title>
-              <Text strong>{messages.length}</Text>
+              <Text strong>{messages?.length || 0}</Text>
             </div>
           </Card>
         </Col>
@@ -81,7 +81,7 @@ const MessagesPage: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <BellOutlined style={{ fontSize: '32px', color: '#fa8c16', marginBottom: '8px' }} />
               <Title level={4}>未读消息</Title>
-              <Text strong type="warning">{messages.filter(msg => msg.status === 'unread').length}</Text>
+              <Text strong type="warning">{messages?.filter(msg => msg.status === 'unread').length || 0}</Text>
             </div>
           </Card>
         </Col>
@@ -90,7 +90,7 @@ const MessagesPage: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <CommentOutlined style={{ fontSize: '32px', color: '#52c41a', marginBottom: '8px' }} />
               <Title level={4}>课程讨论</Title>
-              <Text strong>{discussions.length}</Text>
+              <Text strong>{discussions?.length || 0}</Text>
             </div>
           </Card>
         </Col>
@@ -120,7 +120,7 @@ const MessagesPage: React.FC = () => {
                     showTotal: (total) => `共 ${total} 条消息`
                   }}
                   loading={loading}
-                  dataSource={messages}
+                  dataSource={messages || []}
                   renderItem={(item) => (
                     <List.Item
                       key={item.id}
@@ -163,7 +163,7 @@ const MessagesPage: React.FC = () => {
                         }
                         title={
                           <Space>
-                            {item.title}
+                            {item.title || '消息'}
                             {item.status === 'unread' && (
                               <Badge status="processing" text="未读" />
                             )}
@@ -171,20 +171,20 @@ const MessagesPage: React.FC = () => {
                         }
                         description={
                           <Space>
-                            <Text>{item.sender}</Text>
-                            <Text type="secondary">{item.date}</Text>
-                            <Badge 
+                            <Text>{item.sender || '系统'}</Text>
+                            <Text type="secondary">{item.date || ''}</Text>
+                            <Badge
                               color={
                                 item.type === '提醒' ? '#fa8c16' :
                                 item.type === '互动' ? '#52c41a' :
                                 item.type === '成绩' ? '#52c41a' : '#1890ff'
-                              } 
-                              text={item.type} 
+                              }
+                              text={item.type || '消息'}
                             />
                           </Space>
                         }
                       />
-                      {item.content}
+                      {item.content || ''}
                     </List.Item>
                   )}
                 />
@@ -193,7 +193,7 @@ const MessagesPage: React.FC = () => {
                 <List
                   itemLayout="horizontal"
                   loading={loading}
-                  dataSource={notifications}
+                  dataSource={notifications || []}
                   renderItem={(item) => (
                     <List.Item
                       actions={[
@@ -206,11 +206,11 @@ const MessagesPage: React.FC = () => {
                           item.type === 'exam' ? <ExclamationCircleOutlined style={{ fontSize: '24px', color: '#fa8c16' }} /> :
                           <MessageOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
                         }
-                        title={item.title}
+                        title={item.title || '通知'}
                         description={
                           <Space direction="vertical">
-                            <Text>{item.content}</Text>
-                            <Text type="secondary">{item.date}</Text>
+                            <Text>{item.content || ''}</Text>
+                            <Text type="secondary">{item.date || ''}</Text>
                           </Space>
                         }
                       />
@@ -222,7 +222,7 @@ const MessagesPage: React.FC = () => {
                 <List
                   itemLayout="vertical"
                   loading={loading}
-                  dataSource={discussions}
+                  dataSource={discussions || []}
                   renderItem={(item) => (
                     <List.Item
                       key={item.id}
@@ -254,17 +254,17 @@ const MessagesPage: React.FC = () => {
                         title={<a href="#">{item.title}</a>}
                         description={
                           <Space>
-                            <Text>{item.course}</Text>
+                            <Text>{item.course?.title || '未知课程'}</Text>
                             <Text>•</Text>
-                            <Text>{item.author}</Text>
+                            <Text>{item.author?.username || '匿名'}</Text>
                             <Text>•</Text>
-                            <Text type="secondary">{item.lastReply}</Text>
+                            <Text type="secondary">{item.lastReply || '暂无回复'}</Text>
                           </Space>
                         }
                       />
                       <div>
                         <Space>
-                          <Badge count={item.replies} overflowCount={99} />
+                          <Badge count={item.replies || 0} overflowCount={99} />
                           <Text type="secondary">回复</Text>
                         </Space>
                       </div>

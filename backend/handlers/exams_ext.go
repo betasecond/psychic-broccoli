@@ -12,6 +12,32 @@ import (
 // GetExamStatistics 获取考试统计信息
 func GetExamStatistics(c *gin.Context) {
 	examID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	// 只允许教师和管理员访问
+	if role == "STUDENT" {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
+
+	// 教师只能查看自己课程的统计
+	if role == "INSTRUCTOR" {
+		var instructorID int64
+		err := database.DB.QueryRow(`
+			SELECT c.instructor_id FROM exams e
+			JOIN courses c ON e.course_id = c.id
+			WHERE e.id = ?
+		`, examID).Scan(&instructorID)
+		if err != nil {
+			utils.NotFound(c, "考试不存在")
+			return
+		}
+		if instructorID != userID.(int64) {
+			utils.Forbidden(c, "权限不足")
+			return
+		}
+	}
 
 	// 获取选课学生总数
 	var totalStudents int
@@ -259,6 +285,13 @@ func GetMyExamSubmission(c *gin.Context) {
 // GetExamSubmissionDetail 获取考试答卷详情（教师用）
 func GetExamSubmissionDetail(c *gin.Context) {
 	submissionID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	if role == "STUDENT" {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
 
 	// 获取提交记录
 	var examID, studentID int64
@@ -286,15 +319,21 @@ func GetExamSubmissionDetail(c *gin.Context) {
 		SELECT username, email FROM users WHERE id = ?
 	`, studentID).Scan(&studentName, &studentEmail)
 
-	// 获取考试信息
+	// 获取考试信息，同时校验教师权限
 	var examTitle string
 	var courseTitle string
+	var instructorID int64
 	database.DB.QueryRow(`
-		SELECT e.title, c.title
+		SELECT e.title, c.title, c.instructor_id
 		FROM exams e
 		JOIN courses c ON e.course_id = c.id
 		WHERE e.id = ?
-	`, examID).Scan(&examTitle, &courseTitle)
+	`, examID).Scan(&examTitle, &courseTitle, &instructorID)
+
+	if role == "INSTRUCTOR" && instructorID != userID.(int64) {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
 
 	// 获取答题详情
 	rows, err := database.DB.Query(`
@@ -415,8 +454,13 @@ func UpdateExam(c *gin.Context) {
 		return
 	}
 
+	if !endTime.After(startTime) {
+		utils.BadRequest(c, "结束时间必须晚于开始时间")
+		return
+	}
+
 	_, err = database.DB.Exec(`
-		UPDATE exams 
+		UPDATE exams
 		SET title = ?, start_time = ?, end_time = ?
 		WHERE id = ?
 	`, req.Title, startTime, endTime, examID)

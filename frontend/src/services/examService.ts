@@ -189,5 +189,14 @@ export const examService = {
   async getExamStatistics(id: number): Promise<StatisticsResponse> {
     return api.get(`/exams/${id}/statistics`)
   },
+
+  // AI解析题目文件
+  async parseQuestionsFromFile(examId: number, file: File): Promise<{ questions: any[]; count: number }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/exams/${examId}/parse-questions`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }) as any
+  },
 }
 

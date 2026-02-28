@@ -45,6 +45,7 @@ func main() {
 
     // 静态资源目录（用于作业附件等本地文件）
     r.Static("/static", "./public")
+	r.Static("/public", "./public")
 
 	// API v1路由组
 	v1 := r.Group("/api/v1")
@@ -88,9 +89,10 @@ func main() {
 		// 课程路由
 		courses := v1.Group("/courses")
 		{
-			courses.GET("", handlers.GetCourses)
-			courses.GET("/:id", handlers.GetCourse)
-			courses.GET("/:id/chapters", handlers.GetCourseChapters)
+			// 课程列表使用可选认证（有token就解析，没有也能访问）
+			courses.GET("", middleware.OptionalAuthMiddleware(), handlers.GetCourses)
+			courses.GET("/:id", middleware.OptionalAuthMiddleware(), handlers.GetCourse)
+			courses.GET("/:id/chapters", middleware.OptionalAuthMiddleware(), handlers.GetCourseChapters)
 
 			// 需要认证的路由
 			authenticated := courses.Group("")
@@ -98,28 +100,38 @@ func main() {
 			{
 				authenticated.GET("/my", handlers.GetMyCourses)
 				authenticated.GET("/:id/statistics", handlers.GetCourseStatistics)
+				authenticated.GET("/:id/students", handlers.GetCourseStudents)
+				authenticated.POST("/:id/parse-outline", handlers.ParseCourseOutline)
 				authenticated.POST("", handlers.CreateCourse)
 				authenticated.PUT("/:id", handlers.UpdateCourse)
 				authenticated.DELETE("/:id", handlers.DeleteCourse)
 				authenticated.POST("/:id/enroll", handlers.EnrollCourse)
+				authenticated.PUT("/:id/progress", handlers.UpdateProgress) // 更新学习进度
 				authenticated.POST("/:id/chapters", handlers.CreateChapter)
 				authenticated.PUT("/:id/chapters/:cid", handlers.UpdateChapter)
 				authenticated.DELETE("/:id/chapters/:cid", handlers.DeleteChapter)
+				// 课时路由
+				authenticated.GET("/:id/chapters/:cid/sections", handlers.GetChapterSections)
+				authenticated.POST("/:id/chapters/:cid/sections", handlers.CreateSection)
+				authenticated.PUT("/:id/chapters/:cid/sections/:sid", handlers.UpdateSection)
+				authenticated.DELETE("/:id/chapters/:cid/sections/:sid", handlers.DeleteSection)
 			}
 		}
 
-		// 作业路由
-		assignmentsPublic := v1.Group("/assignments")
+		// 章节路由（需要认证）
+		chapters := v1.Group("/chapters")
+		chapters.Use(middleware.AuthMiddleware())
 		{
-			// 公开的作业详情
-			assignmentsPublic.GET("/:id", handlers.GetAssignment)
+			chapters.POST("/:id/complete", handlers.CompleteChapter) // 标记章节完成
 		}
 
+		// 作业路由
 		assignments := v1.Group("/assignments")
 		assignments.Use(middleware.AuthMiddleware())
 		{
 			assignments.GET("", handlers.GetAssignments)
 			assignments.GET("/my", handlers.GetMyAssignments)
+			assignments.GET("/:id", handlers.GetAssignment)
 			assignments.POST("", handlers.CreateAssignment)
 			assignments.GET("/:id/statistics", handlers.GetAssignmentStatistics)
 			assignments.PUT("/:id", handlers.UpdateAssignment)
@@ -148,6 +160,7 @@ func main() {
 			exams.POST("/:id/submit", handlers.SubmitExam)
 			exams.GET("/:id/results", handlers.GetExamResults)
 			exams.GET("/submissions/:id", handlers.GetExamSubmissionDetail)
+			exams.POST("/:id/parse-questions", handlers.ParseQuestionsWithAI)
 		}
 
 		// 消息路由
@@ -165,11 +178,51 @@ func main() {
 			notifications.GET("", handlers.GetNotifications)
 		}
 
+		// 直播路由
+		live := v1.Group("/live")
+		live.Use(middleware.AuthMiddleware())
+		{
+			live.POST("", handlers.CreateLive)                  // 创建直播
+			live.GET("", handlers.GetLiveList)                  // 获取直播列表
+			live.GET("/:id", handlers.GetLiveDetail)            // 获取直播详情
+			live.PUT("/:id/start", handlers.StartLive)          // 开始直播
+			live.PUT("/:id/end", handlers.EndLive)              // 结束直播
+			live.POST("/:id/join", handlers.JoinLive)           // 加入直播
+			live.POST("/:id/leave", handlers.LeaveLive)         // 离开直播
+			live.GET("/:id/viewers", handlers.GetLiveViewers)   // 获取观看人数
+
+			// 直播聊天
+			live.GET("/:id/messages", handlers.GetLiveMessages)         // 获取聊天消息
+			live.POST("/:id/messages", handlers.SendLiveMessage)        // 发送聊天消息
+			live.GET("/:id/messages/count", handlers.GetLiveMessageCount) // 获取消息数量
+			live.DELETE("/:id/messages/:messageId", handlers.DeleteLiveMessage) // 删除消息
+		}
+
 		// 讨论路由
 		discussions := v1.Group("/discussions")
+		discussions.Use(middleware.AuthMiddleware())
 		{
-			discussions.GET("", handlers.GetDiscussions)
+			discussions.POST("", handlers.CreateDiscussion)            // 创建讨论
+			discussions.GET("", handlers.GetDiscussions)               // 获取讨论列表
+			discussions.GET("/:id", handlers.GetDiscussionDetail)      // 获取讨论详情
+			discussions.POST("/:id/replies", handlers.ReplyDiscussion) // 回复讨论
+			discussions.PUT("/:id/close", handlers.CloseDiscussion)    // 关闭讨论
+			discussions.DELETE("/:id", handlers.DeleteDiscussion)      // 删除讨论
 		}
+
+		// 文件上传路由
+		files := v1.Group("/files")
+		files.Use(middleware.AuthMiddleware())
+		{
+			files.POST("/upload", handlers.UploadFile)       // 上传单个文件
+			files.POST("/upload-multiple", handlers.UploadFiles) // 上传多个文件
+			files.DELETE("", handlers.DeleteFile)            // 删除文件
+		}
+
+		// 课程资料路由
+		v1.GET("/courses/:id/materials", middleware.AuthMiddleware(), handlers.GetCourseMaterials)
+		v1.POST("/courses/:id/materials", middleware.AuthMiddleware(), handlers.UploadCourseMaterial)
+		v1.DELETE("/courses/:id/materials/:mid", middleware.AuthMiddleware(), handlers.DeleteCourseMaterial)
 	}
 
 	// 健康检查

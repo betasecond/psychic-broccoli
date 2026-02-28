@@ -1,69 +1,140 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Tabs, Tag, Statistic } from 'antd';
-import { BookOutlined, UserOutlined, StarOutlined, FileTextOutlined, VideoCameraOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  Card,
+  Row,
+  Col,
+  Button,
+  Typography,
+  Space,
+  Table,
+  Tag,
+  Statistic,
+  Modal,
+  message,
+  Popconfirm,
+} from 'antd'
+import {
+  BookOutlined,
+  UserOutlined,
+  StarOutlined,
+  FileTextOutlined,
+  EditOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  BarChartOutlined,
+  EyeOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import { courseService, type Course } from '@/services/courseService'
+import { useAppSelector } from '@/store'
 
-const { Title, Text } = Typography;
-const { TabPane } = Tabs;
+const { Title, Text } = Typography
 
 const TeacherCoursesPage: React.FC = () => {
-  // 模拟课程数据
-  const courses = [
-    {
-      id: '1',
-      title: 'React 深入浅出',
-      students: 156,
-      progress: 75,
-      status: '进行中',
-      category: '前端开发',
-      rating: 4.8,
-    },
-    {
-      id: '2',
-      title: 'TypeScript 实战',
-      students: 98,
-      progress: 60,
-      status: '进行中',
-      category: '编程语言',
-      rating: 4.9,
-    },
-    {
-      id: '3',
-      title: '前端开发基础',
-      students: 203,
-      progress: 100,
-      status: '已完成',
-      category: '前端开发',
-      rating: 4.7,
-    },
-  ];
+  const navigate = useNavigate()
+  const currentUser = useAppSelector((state) => state.auth.user)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statistics, setStatistics] = useState({
+    totalCourses: 0,
+    totalStudents: 0,
+    averageRating: 4.8,
+  })
 
-  // 模拟课程材料数据
-  const materials = [
-    {
-      id: 'm1',
-      name: 'React 基础课件.pdf',
-      type: '文档',
-      size: '2.4 MB',
-      uploadDate: '2024-01-15',
-      downloads: 124,
-    },
-    {
-      id: 'm2',
-      name: 'TypeScript 视频教程.mp4',
-      type: '视频',
-      size: '156 MB',
-      uploadDate: '2024-02-01',
-      downloads: 89,
-    },
-    {
-      id: 'm3',
-      name: '前端开发实战项目.zip',
-      type: '压缩包',
-      size: '12.3 MB',
-      uploadDate: '2023-12-20',
-      downloads: 156,
-    },
-  ];
+  useEffect(() => {
+    fetchMyCourses()
+  }, [])
+
+  const fetchMyCourses = async () => {
+    if (!currentUser?.userId) return
+
+    setLoading(true)
+    try {
+      const response = await courseService.getCourses({
+        instructorId: currentUser.userId,
+      })
+
+      const coursesData = response.courses || []
+      setCourses(Array.isArray(coursesData) ? coursesData : [])
+
+      // 计算统计数据
+      setStatistics({
+        totalCourses: coursesData.length,
+        totalStudents: 0, // TODO: 从后端获取
+        averageRating: 4.8, // TODO: 从后端获取
+      })
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '获取课程列表失败')
+      setCourses([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateCourse = () => {
+    navigate('/teacher/courses/create')
+  }
+
+  const handleViewCourse = (courseId: number) => {
+    navigate(`/teacher/courses/${courseId}/view`)
+  }
+
+  const handleEditCourse = (courseId: number) => {
+    navigate(`/teacher/courses/${courseId}/edit`)
+  }
+
+  const handleViewStatistics = async (courseId: number) => {
+    try {
+      const response = await courseService.getCourseStatistics(courseId)
+      // api 拦截器已解包 data，response 直接是统计对象
+      const stats = (response as any).data || response as any
+
+      Modal.info({
+        title: '课程数据统计',
+        content: (
+          <div>
+            <p>学生人数: {stats.studentCount}</p>
+            <p>作业数量: {stats.assignmentCount}</p>
+            <p>考试数量: {stats.examCount}</p>
+            <p>章节数量: {stats.chapterCount}</p>
+          </div>
+        ),
+        width: 500,
+      })
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '获取统计数据失败')
+    }
+  }
+
+  const handleDeleteCourse = async (courseId: number) => {
+    try {
+      await courseService.deleteCourse(courseId)
+      message.success('课程删除成功')
+      fetchMyCourses()
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '删除课程失败')
+    }
+  }
+
+  const handleTogglePublish = async (course: Course) => {
+    const newStatus = course.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED'
+    const action = newStatus === 'PUBLISHED' ? '发布' : '取消发布'
+    try {
+      await courseService.updateCourse(course.id, {
+        title: course.title,
+        description: course.description || '',
+        categoryId: course.categoryId,
+        coverImageUrl: course.coverImageUrl,
+        status: newStatus,
+      } as any)
+      message.success(`课程已${action}`)
+      fetchMyCourses()
+    } catch (error: any) {
+      message.error(error.response?.data?.error || `${action}失败`)
+    }
+  }
 
   const columns = [
     {
@@ -74,162 +145,123 @@ const TeacherCoursesPage: React.FC = () => {
     },
     {
       title: '分类',
-      dataIndex: 'category',
-      key: 'category',
-      render: (category: string) => (
-        <Tag color="blue">{category}</Tag>
-      ),
-    },
-    {
-      title: '学生数',
-      dataIndex: 'students',
-      key: 'students',
-      render: (students: number) => (
-        <Space>
-          <UserOutlined />
-          <span>{students}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '进度',
-      key: 'progress',
-      render: (record: any) => (
-        <div>
-          <div>{record.progress}%</div>
-          <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-            <div 
-              style={{ 
-                width: `${record.progress}%`, 
-                height: '8px', 
-                backgroundColor: record.progress === 100 ? '#52c41a' : '#1890ff',
-                borderRadius: '4px'
-              }}
-            />
-          </div>
-        </div>
-      ),
+      dataIndex: 'categoryName',
+      key: 'categoryName',
+      render: (category: string) =>
+        category ? <Tag color="blue">{category}</Tag> : <Tag>未分类</Tag>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => (
-        <Tag color={status === '已完成' ? 'green' : 'blue'}>{status}</Tag>
-      ),
+      render: (status: string) => {
+        if (status === 'PUBLISHED') return <Tag color="green">已发布</Tag>
+        if (status === 'ARCHIVED') return <Tag color="default">已归档</Tag>
+        return <Tag color="orange">草稿</Tag>
+      },
     },
     {
-      title: '评分',
-      key: 'rating',
-      render: (record: any) => (
-        <Space>
-          <StarOutlined style={{ color: '#faad14' }} />
-          <span>{record.rating}</span>
-        </Space>
-      ),
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
     },
     {
       title: '操作',
       key: 'action',
-      render: () => (
-        <Space size="middle">
-          <Button type="link">查看</Button>
-          <Button type="link">编辑</Button>
-          <Button type="link">数据</Button>
+      render: (_: any, record: Course) => (
+        <Space size="small" wrap>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewCourse(record.id)}
+          >
+            查看
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEditCourse(record.id)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title={record.status === 'PUBLISHED' ? '确定要取消发布吗？学生将无法看到此课程' : '确定要发布此课程吗？学生将可以看到并选课'}
+            onConfirm={() => handleTogglePublish(record)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              icon={record.status === 'PUBLISHED' ? <StopOutlined /> : <CheckCircleOutlined />}
+              style={{ color: record.status === 'PUBLISHED' ? '#fa8c16' : '#52c41a' }}
+            >
+              {record.status === 'PUBLISHED' ? '取消发布' : '发布'}
+            </Button>
+          </Popconfirm>
+          <Button
+            type="link"
+            size="small"
+            icon={<BarChartOutlined />}
+            onClick={() => handleViewStatistics(record.id)}
+          >
+            数据
+          </Button>
+          <Popconfirm
+            title="确定要删除这门课程吗？"
+            description="删除后将无法恢复，请谨慎操作"
+            onConfirm={() => handleDeleteCourse(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+            >
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
-  ];
-
-  const materialColumns = [
-    {
-      title: '材料名称',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string) => <Text strong>{text}</Text>,
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: string) => (
-        <Tag color={type === '文档' ? 'blue' : type === '视频' ? 'green' : 'orange'}>{type}</Tag>
-      ),
-    },
-    {
-      title: '大小',
-      dataIndex: 'size',
-      key: 'size',
-    },
-    {
-      title: '上传日期',
-      dataIndex: 'uploadDate',
-      key: 'uploadDate',
-    },
-    {
-      title: '下载量',
-      dataIndex: 'downloads',
-      key: 'downloads',
-      render: (downloads: number) => (
-        <Space>
-          <FileTextOutlined />
-          <span>{downloads}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: () => (
-        <Space size="middle">
-          <Button type="link">下载</Button>
-          <Button type="link">编辑</Button>
-          <Button type="link">删除</Button>
-        </Space>
-      ),
-    },
-  ];
+  ]
 
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <Title level={2}>课程管理</Title>
-        <Text type="secondary">您的教学课程和相关材料</Text>
+        <Text type="secondary">管理您的教学课程</Text>
       </div>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card>
             <Statistic
               title="我的课程"
-              value={3}
+              value={statistics.totalCourses}
               prefix={<BookOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card>
             <Statistic
               title="在学学生"
-              value={457}
+              value={statistics.totalStudents}
               prefix={<UserOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="课程材料"
-              value={24}
-              prefix={<FileTextOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={8}>
           <Card>
             <Statistic
               title="平均评分"
-              value={4.8}
+              value={statistics.averageRating}
               precision={1}
               prefix={<StarOutlined />}
               valueStyle={{ color: '#3f8600' }}
@@ -241,118 +273,61 @@ const TeacherCoursesPage: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
         <Col span={24}>
           <Card>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              style={{
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
               <Space>
-                <Button type="primary" icon={<PlusOutlined />}>创建课程</Button>
-                <Button icon={<EditOutlined />}>批量操作</Button>
-              </Space>
-              <Space>
-                <Button icon={<SearchOutlined />}>搜索课程</Button>
-                <Button>按状态筛选</Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleCreateCourse}
+                >
+                  创建课程
+                </Button>
               </Space>
             </div>
-            
-            <Tabs defaultActiveKey="courses">
-              <TabPane tab="我的课程" key="courses">
-                <Table 
-                  dataSource={courses} 
-                  columns={columns} 
-                  rowKey="id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total) => `共 ${total} 门课程`
-                  }}
-                />
-              </TabPane>
-              <TabPane tab="课程材料" key="materials">
-                <Table 
-                  dataSource={materials} 
-                  columns={materialColumns} 
-                  rowKey="id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showQuickJumper: true,
-                    showTotal: (total) => `共 ${total} 个材料`
-                  }}
-                />
-              </TabPane>
-            </Tabs>
-          </Card>
-        </Col>
-      </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <VideoCameraOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="React 深入浅出"
-              description="学习React核心概念和最佳实践"
+            <Table
+              dataSource={courses}
+              columns={columns}
+              rowKey="id"
+              loading={loading}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `共 ${total} 门课程`,
+              }}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '40px 0' }}>
+                    <FileTextOutlined
+                      style={{ fontSize: 48, color: '#d9d9d9' }}
+                    />
+                    <p style={{ marginTop: 16, color: '#999' }}>
+                      还没有创建课程
+                    </p>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={handleCreateCourse}
+                    >
+                      创建第一门课程
+                    </Button>
+                  </div>
+                ),
+              }}
             />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <UserOutlined /> 156 学生
-              </div>
-              <Button type="link">管理</Button>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BookOutlined style={{ fontSize: '48px', color: '#fa8c16' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="TypeScript 实战"
-              description="TypeScript在项目中的实际应用"
-            />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <UserOutlined /> 98 学生
-              </div>
-              <Button type="link">管理</Button>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card 
-            hoverable
-            cover={
-              <div style={{ height: '120px', backgroundColor: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileTextOutlined style={{ fontSize: '48px', color: '#52c41a' }} />
-              </div>
-            }
-          >
-            <Card.Meta
-              title="前端开发基础"
-              description="HTML, CSS, JavaScript基础知识"
-            />
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <UserOutlined /> 203 学生
-              </div>
-              <Button type="link">管理</Button>
-            </div>
           </Card>
         </Col>
       </Row>
     </div>
-  );
-};
+  )
+}
 
-export default TeacherCoursesPage;
+export default TeacherCoursesPage

@@ -27,8 +27,15 @@ export interface Notification {
 export interface Discussion {
   id: number
   title: string
-  course: string
-  author: string
+  course: {
+    id: number
+    title: string
+  }
+  author: {
+    id: number
+    username: string
+    avatarUrl?: string
+  }
   replies: number
   lastReply: string
   status: string

@@ -1,289 +1,218 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Table, Statistic, Progress, Divider } from 'antd';
-import { BarChartOutlined, UserOutlined, BookOutlined, FileTextOutlined, VideoCameraOutlined, TrophyOutlined, CalendarOutlined, TeamOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Card, Row, Col, Typography, Space, Table, Statistic, Spin, Progress } from 'antd';
+import { BarChartOutlined, UserOutlined, BookOutlined, FileTextOutlined, TrophyOutlined, TeamOutlined } from '@ant-design/icons';
+import { courseService } from '../../services/courseService';
+import { userService } from '../../services/userService';
 
 const { Title, Text } = Typography;
 
-const AnalyticsPage: React.FC = () => {
-  // 模拟数据
-  const platformStats = [
-    { id: '1', title: '总注册用户', value: 4589, change: '+12.5%', icon: <UserOutlined /> },
-    { id: '2', title: '活跃用户(月)', value: 2847, change: '+8.3%', icon: <TeamOutlined /> },
-    { id: '3', title: '总课程数', value: 128, change: '+5.7%', icon: <BookOutlined /> },
-    { id: '4', title: '已完成课程', value: 3245, change: '+15.2%', icon: <TrophyOutlined /> },
-    { id: '5', title: '总作业数', value: 567, change: '+3.2%', icon: <FileTextOutlined /> },
-    { id: '6', title: '总考试数', value: 189, change: '+7.1%', icon: <BarChartOutlined /> },
-    { id: '7', title: '直播课程', value: 89, change: '+22.4%', icon: <VideoCameraOutlined /> },
-    { id: '8', title: '系统评分', value: 4.7, change: '+0.2', icon: <BarChartOutlined /> },
-  ];
+const AdminAnalyticsPage: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [totalUsers, setTotalUsers]         = useState(0);
+  const [studentCount, setStudentCount]     = useState(0);
+  const [instructorCount, setInstructorCount] = useState(0);
+  const [courses, setCourses]               = useState<any[]>([]);
+  const [courseStats, setCourseStats]       = useState<any[]>([]);
 
-  const topCourses = [
-    { id: '1', name: '前端开发基础', students: 203, completion: 91 },
-    { id: '2', name: 'React 深入浅出', students: 156, completion: 78 },
-    { id: '3', name: 'TypeScript 实战', students: 98, completion: 82 },
-    { id: '4', name: 'Vue 3 实战课程', students: 87, completion: 85 },
-    { id: '5', name: 'JavaScript 高级编程', students: 134, completion: 76 },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [usersRes, coursesRes] = await Promise.all([
+          userService.getUsers({ page: 1, pageSize: 1000 }),
+          courseService.getCourses({}) as any,
+        ]);
 
-  const topInstructors = [
-    { id: '1', name: '张老师', courses: 3, students: 457, rating: 4.8 },
-    { id: '2', name: '李老师', courses: 2, students: 195, rating: 4.9 },
-    { id: '3', name: '王老师', courses: 4, students: 389, rating: 4.7 },
-    { id: '4', name: '赵老师', courses: 1, students: 87, rating: 4.6 },
-  ];
+        const allUsers = usersRes?.users || [];
+        setTotalUsers(allUsers.length);
+        setStudentCount(allUsers.filter((u: any) => u.role === 'STUDENT').length);
+        setInstructorCount(allUsers.filter((u: any) => u.role === 'INSTRUCTOR').length);
 
-  const columns = [
+        const courseList: any[] = coursesRes?.courses || [];
+        setCourses(courseList);
+
+        // 获取每门课程的统计信息
+        const stats = await Promise.all(
+          courseList.slice(0, 10).map(async (c: any) => {
+            try {
+              const s = await courseService.getCourseStatistics(c.id) as any;
+              return { ...c, studentCount: s?.studentCount ?? 0, assignmentCount: s?.assignmentCount ?? 0, examCount: s?.examCount ?? 0 };
+            } catch {
+              return { ...c, studentCount: 0, assignmentCount: 0, examCount: 0 };
+            }
+          })
+        );
+        setCourseStats(stats);
+      } catch {
+        // 静默失败
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const totalAssignments = courseStats.reduce((s, c) => s + (c.assignmentCount || 0), 0);
+  const totalExams       = courseStats.reduce((s, c) => s + (c.examCount || 0), 0);
+
+  // 按学生数排序，取前5
+  const topCourses = [...courseStats].sort((a, b) => b.studentCount - a.studentCount).slice(0, 5);
+  const maxStudents = topCourses[0]?.studentCount || 1;
+
+  // 按教师分组
+  const instructorMap: Record<string, { name: string; courses: number; students: number }> = {};
+  courseStats.forEach((c) => {
+    const key = String(c.instructorId);
+    if (!instructorMap[key]) instructorMap[key] = { name: c.instructorName || '未知', courses: 0, students: 0 };
+    instructorMap[key].courses++;
+    instructorMap[key].students += c.studentCount || 0;
+  });
+  const topInstructors = Object.values(instructorMap)
+    .sort((a, b) => b.students - a.students)
+    .slice(0, 5)
+    .map((v, i) => ({ ...v, id: i }));
+
+  const courseColumns = [
+    { title: '排名', key: 'rank', render: (_: any, __: any, i: number) => <Text strong>{i + 1}</Text>, width: 60 },
+    { title: '课程名称', dataIndex: 'title', key: 'title', render: (t: string) => <Text strong>{t}</Text> },
     {
-      title: '排名',
-      key: 'index',
-      render: (text, record, index) => <Text strong>{index + 1}</Text>,
+      title: '选课人数', dataIndex: 'studentCount', key: 'studentCount',
+      render: (n: number) => <Space><UserOutlined /><span>{n}</span></Space>,
     },
     {
-      title: '课程名称',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string) => <Text strong>{text}</Text>,
-    },
-    {
-      title: '学生数',
-      dataIndex: 'students',
-      key: 'students',
-      render: (students: number) => (
-        <Space>
-          <UserOutlined />
-          <span>{students}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '完成率',
-      key: 'completion',
-      render: (record: any) => (
-        <div>
-          <div>{record.completion}%</div>
-          <Progress percent={record.completion} size="small" />
-        </div>
+      title: '占比', key: 'pct',
+      render: (r: any) => (
+        <Progress percent={Math.round((r.studentCount / maxStudents) * 100)} size="small" showInfo={false} />
       ),
     },
   ];
 
   const instructorColumns = [
-    {
-      title: '排名',
-      key: 'index',
-      render: (text, record, index) => <Text strong>{index + 1}</Text>,
-    },
-    {
-      title: '教师姓名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string) => <Text strong>{text}</Text>,
-    },
-    {
-      title: '课程数',
-      dataIndex: 'courses',
-      key: 'courses',
-      render: (courses: number) => (
-        <Space>
-          <BookOutlined />
-          <span>{courses}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '学生数',
-      dataIndex: 'students',
-      key: 'students',
-      render: (students: number) => (
-        <Space>
-          <TeamOutlined />
-          <span>{students}</span>
-        </Space>
-      ),
-    },
-    {
-      title: '评分',
-      key: 'rating',
-      render: (record: any) => (
-        <div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{record.rating}</div>
-          <div>
-            <span style={{ color: '#faad14' }}>★</span>
-          </div>
-        </div>
-      ),
-    },
+    { title: '排名', key: 'rank', render: (_: any, __: any, i: number) => <Text strong>{i + 1}</Text>, width: 60 },
+    { title: '教师', dataIndex: 'name', key: 'name', render: (t: string) => <Text strong>{t}</Text> },
+    { title: '课程数', dataIndex: 'courses', key: 'courses', render: (n: number) => <Space><BookOutlined /><span>{n}</span></Space> },
+    { title: '学生总数', dataIndex: 'students', key: 'students', render: (n: number) => <Space><TeamOutlined /><span>{n}</span></Space> },
   ];
 
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <Title level={2}>数据分析</Title>
-        <Text type="secondary">平台运营数据和学习分析</Text>
+        <Text type="secondary">平台运营数据概览</Text>
       </div>
 
-      <Row gutter={[16, 16]}>
-        {platformStats.map((stat) => (
-          <Col xs={24} sm={12} md={6} key={stat.id}>
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>
-                    {stat.icon}
-                  </div>
-                  <Text type="secondary">{stat.title}</Text>
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px' }}>
-                    {stat.value}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#52c41a' }}>
-                    {stat.change}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                    月同比
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px' }}><Spin size="large" /></div>
+      ) : (
+        <>
+          <Row gutter={[16, 16]}>
+            {[
+              { title: '注册用户总数', value: totalUsers,       icon: <UserOutlined />,       color: undefined },
+              { title: '学生数',       value: studentCount,     icon: <TeamOutlined />,       color: undefined },
+              { title: '教师数',       value: instructorCount,  icon: <BookOutlined />,       color: '#1890ff'  },
+              { title: '课程总数',     value: courses.length,   icon: <BarChartOutlined />,   color: undefined },
+              { title: '作业总数',     value: totalAssignments, icon: <FileTextOutlined />,   color: undefined },
+              { title: '考试总数',     value: totalExams,       icon: <TrophyOutlined />,     color: '#3f8600'  },
+            ].map((stat) => (
+              <Col xs={24} sm={12} md={4} key={stat.title}>
+                <Card>
+                  <Statistic
+                    title={stat.title}
+                    value={stat.value}
+                    prefix={stat.icon}
+                    valueStyle={stat.color ? { color: stat.color } : undefined}
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} md={12}>
-          <Card title="热门课程排行">
-            <Table 
-              dataSource={topCourses} 
-              columns={columns} 
-              rowKey="id"
-              pagination={false}
-              showHeader={false}
-            />
-          </Card>
-        </Col>
-        
-        <Col xs={24} md={12}>
-          <Card title="优秀教师排行">
-            <Table 
-              dataSource={topInstructors} 
-              columns={instructorColumns} 
-              rowKey="id"
-              pagination={false}
-              showHeader={false}
-            />
-          </Card>
-        </Col>
-      </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+            <Col xs={24} md={12}>
+              <Card title="热门课程（按选课人数）">
+                {topCourses.length > 0 ? (
+                  <Table
+                    dataSource={topCourses}
+                    columns={courseColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                  />
+                ) : <Text type="secondary">暂无课程数据</Text>}
+              </Card>
+            </Col>
 
-      <Divider />
+            <Col xs={24} md={12}>
+              <Card title="教师排行（按学生总数）">
+                {topInstructors.length > 0 ? (
+                  <Table
+                    dataSource={topInstructors}
+                    columns={instructorColumns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                  />
+                ) : <Text type="secondary">暂无教师数据</Text>}
+              </Card>
+            </Col>
+          </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card title="用户注册趋势">
-            <div style={{ height: '200px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: '20px 0' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '120px', width: '30px', backgroundColor: '#e6f7ff', marginBottom: '8px' }}></div>
-                <Text>周一</Text>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '150px', width: '30px', backgroundColor: '#bae7ff', marginBottom: '8px' }}></div>
-                <Text>周二</Text>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '180px', width: '30px', backgroundColor: '#1890ff', marginBottom: '8px' }}></div>
-                <Text>周三</Text>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '160px', width: '30px', backgroundColor: '#40a9ff', marginBottom: '8px' }}></div>
-                <Text>周四</Text>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ height: '140px', width: '30px', backgroundColor: '#85a5ff', marginBottom: '8px' }}></div>
-                <Text>周五</Text>
-              </div>
-            </div>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="课程完成率分布">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>90-100%</Text>
-                  <Text strong>45</Text>
-                </div>
-                <Progress percent={35} strokeColor="#52c41a" showInfo={false} />
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>80-89%</Text>
-                  <Text strong>32</Text>
-                </div>
-                <Progress percent={25} strokeColor="#1890ff" showInfo={false} />
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>70-79%</Text>
-                  <Text strong>18</Text>
-                </div>
-                <Progress percent={14} strokeColor="#fa8c16" showInfo={false} />
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>70%以下</Text>
-                  <Text strong>8</Text>
-                </div>
-                <Progress percent={6} strokeColor="#ff4d4f" showInfo={false} />
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="平台数据概览">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div style={{ padding: '12px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <BarChartOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
-                  <Text strong>活跃度趋势</Text>
-                </div>
-                <Text>本月用户活跃度提升 8.3%</Text>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <BookOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-                  <Text strong>课程完成度</Text>
-                </div>
-                <Text>平均课程完成率 81.2%</Text>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <TrophyOutlined style={{ color: '#fa8c16', marginRight: '8px' }} />
-                  <Text strong>用户满意度</Text>
-                </div>
-                <Text>平台平均评分 4.7/5.0</Text>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <VideoCameraOutlined style={{ color: '#722ed1', marginRight: '8px' }} />
-                  <Text strong>直播课程</Text>
-                </div>
-                <Text>直播课程参与率 89.5%</Text>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
+            <Col xs={24} md={12}>
+              <Card title="用户角色分布">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {[
+                    { label: '学生', count: studentCount,    color: '#1890ff' },
+                    { label: '教师', count: instructorCount, color: '#52c41a' },
+                    { label: '管理员', count: totalUsers - studentCount - instructorCount, color: '#fa8c16' },
+                  ].map(({ label, count, color }) => (
+                    <div key={label}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text>{label}</Text>
+                        <Text strong>{count} 人（{totalUsers > 0 ? Math.round((count / totalUsers) * 100) : 0}%）</Text>
+                      </div>
+                      <Progress
+                        percent={totalUsers > 0 ? Math.round((count / totalUsers) * 100) : 0}
+                        strokeColor={color}
+                        showInfo={false}
+                      />
+                    </div>
+                  ))}
+                </Space>
+              </Card>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Card title="课程状态分布">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {[
+                    { label: '已发布', status: 'PUBLISHED', color: '#1890ff' },
+                    { label: '草稿',   status: 'DRAFT',     color: '#fa8c16' },
+                    { label: '已归档', status: 'ARCHIVED',  color: '#8c8c8c' },
+                  ].map(({ label, status, color }) => {
+                    const count = courses.filter((c) => c.status === status).length;
+                    return (
+                      <div key={label}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text>{label}</Text>
+                          <Text strong>{count} 门</Text>
+                        </div>
+                        <Progress
+                          percent={courses.length > 0 ? Math.round((count / courses.length) * 100) : 0}
+                          strokeColor={color}
+                          showInfo={false}
+                        />
+                      </div>
+                    );
+                  })}
+                </Space>
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
     </div>
   );
 };
 
-export default AnalyticsPage;
+export default AdminAnalyticsPage;

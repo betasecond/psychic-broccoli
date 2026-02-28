@@ -443,150 +443,71 @@ const UsersPage: React.FC = () => {
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card title="用户活跃度">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>活跃用户</Text>
-                  <Text strong type="success">342</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '75%', 
-                      height: '8px', 
-                      backgroundColor: '#52c41a',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>一般用户</Text>
-                  <Text strong type="warning">89</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '20%', 
-                      height: '8px', 
-                      backgroundColor: '#fa8c16',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>不活跃用户</Text>
-                  <Text strong type="danger">26</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '5%', 
-                      height: '8px', 
-                      backgroundColor: '#ff4d4f',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-            </Space>
+        <Col xs={24} sm={12} md={12}>
+          <Card title="用户角色分布" loading={loading}>
+            {(() => {
+              const total = students.length + instructors.length + admins.length || 1;
+              const studentPct = Math.round((students.length / total) * 100);
+              const instructorPct = Math.round((instructors.length / total) * 100);
+              const adminPct = Math.round((admins.length / total) * 100);
+              return (
+                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <Text>学生</Text>
+                      <Text strong>{students.length} 人（{studentPct}%）</Text>
+                    </div>
+                    <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${studentPct}%`, height: '8px', backgroundColor: '#1890ff', borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <Text>教师</Text>
+                      <Text strong>{instructors.length} 人（{instructorPct}%）</Text>
+                    </div>
+                    <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${instructorPct}%`, height: '8px', backgroundColor: '#52c41a', borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <Text>管理员</Text>
+                      <Text strong>{admins.length} 人（{adminPct}%）</Text>
+                    </div>
+                    <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(adminPct, 1)}%`, height: '8px', backgroundColor: '#fa8c16', borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                </Space>
+              );
+            })()}
           </Card>
         </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="用户分布">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>学生用户</Text>
-                  <Text strong>389 (85%)</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '85%', 
-                      height: '8px', 
-                      backgroundColor: '#1890ff',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>教师用户</Text>
-                  <Text strong>65 (14%)</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '14%', 
-                      height: '8px', 
-                      backgroundColor: '#52c41a',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <Text>管理员用户</Text>
-                  <Text strong>3 (1%)</Text>
-                </div>
-                <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: '1%', 
-                      height: '8px', 
-                      backgroundColor: '#fa8c16',
-                      borderRadius: '4px'
-                    }}
-                  />
-                </div>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        
-        <Col xs={24} sm={12} md={8}>
-          <Card title="系统概览">
+
+        <Col xs={24} sm={12} md={12}>
+          <Card title="用户数据概览" loading={loading}>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <div style={{ padding: '12px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <UserOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-                  <Text strong>新用户注册提醒</Text>
+                  <Text strong>平台总用户</Text>
                 </div>
                 <div style={{ marginTop: '8px' }}>
-                  <Text>昨日新增用户 12 人</Text>
+                  <Text>共 {students.length + instructors.length + admins.length} 名注册用户</Text>
                 </div>
               </div>
-              
               <div style={{ padding: '12px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <TeamOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
-                  <Text strong>活跃用户提醒</Text>
+                  <Text strong>学生与教师比</Text>
                 </div>
                 <div style={{ marginTop: '8px' }}>
-                  <Text>今日活跃用户 245 人</Text>
-                </div>
-              </div>
-              
-              <div style={{ padding: '12px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <CalendarOutlined style={{ color: '#fa8c16', marginRight: '8px' }} />
-                  <Text strong>本月统计</Text>
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <Text>本月新增用户 156 人</Text>
+                  <Text>
+                    {instructors.length > 0
+                      ? `每位教师平均对应 ${Math.round(students.length / instructors.length)} 名学生`
+                      : '暂无教师数据'}
+                  </Text>
                 </div>
               </div>
             </Space>

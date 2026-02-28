@@ -7,19 +7,26 @@ import {
 } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { 
-  LoginPage, 
-  RegisterPage, 
+import { useAppSelector } from './store'
+import {
+  LoginPage,
+  RegisterPage,
   ProfilePage,
   // Student pages
   AssignmentsPage,
   AssignmentDetailPage,
   CoursesPage,
+  CourseBrowsePage,
   CourseDetailPage,
   ExamsPage,
+  ExamDetailPage,
+  TakeExamPage,
   LiveClassesPage,
   SchedulePage,
   MessagesPage,
+  WatchLivePage,
+  DiscussionsPage,
+  DiscussionDetailPage,
   // Teacher pages
   TeacherCoursesPage,
   StudentsPage,
@@ -27,15 +34,21 @@ import {
   TeacherExamsPage,
   TeacherLiveClassesPage,
   AnalyticsPage,
+  LiveManagementPage,
+  LiveStreamPage,
   // Teacher sub-pages
   CreateCoursePage,
+  CourseEditPage,
   CourseMaterialsPage,
+  TeacherCourseViewPage,
   AssignmentsListPage,
   CreateAssignmentPage,
   GradingPage,
   ExamsListPage,
   CreateExamPage,
   ExamResultsPage,
+  EditExamPage,
+  SubmissionDetailPage,
   // Admin pages
   UsersPage,
   AdminCoursesPage,
@@ -52,6 +65,18 @@ import './App.css'
 const StudentDashboard = () => <RoleBasedWelcome />
 const TeacherDashboard = () => <RoleBasedWelcome />
 const AdminDashboard = () => <RoleBasedWelcome />
+
+// 根路径重定向：根据登录状态和角色跳转
+const RootRedirect = () => {
+  const { token, user } = useAppSelector(state => state.auth)
+  if (!token) return <Navigate to="/login" replace />
+  switch (user?.role) {
+    case 'STUDENT':   return <Navigate to="/student/dashboard" replace />
+    case 'INSTRUCTOR': return <Navigate to="/teacher/dashboard" replace />
+    case 'ADMIN':     return <Navigate to="/admin/dashboard" replace />
+    default:          return <Navigate to="/login" replace />
+  }
+}
 
 function App() {
   useEffect(() => {
@@ -110,6 +135,16 @@ function App() {
                 }
               />
               <Route
+                path="/student/courses/browse"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <CourseBrowsePage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/student/courses/:id"
                 element={
                   <ProtectedRoute requiredRole="STUDENT">
@@ -150,6 +185,26 @@ function App() {
                 }
               />
               <Route
+                path="/student/exams/:id"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <ExamDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/exams/:id/take"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <TakeExamPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/student/live-classes"
                 element={
                   <ProtectedRoute requiredRole="STUDENT">
@@ -179,7 +234,37 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              
+              <Route
+                path="/student/live/:id"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <WatchLivePage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/discussions"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <DiscussionsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/discussions/:id"
+                element={
+                  <ProtectedRoute requiredRole="STUDENT">
+                    <AppLayout>
+                      <DiscussionDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Teacher routes - require INSTRUCTOR role */}
               <Route
                 path="/teacher/dashboard"
@@ -217,6 +302,26 @@ function App() {
                   <ProtectedRoute requiredRole="INSTRUCTOR">
                     <AppLayout>
                       <CreateCoursePage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/courses/:id/edit"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <CourseEditPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/courses/:id/view"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <TeacherCourseViewPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }
@@ -322,6 +427,26 @@ function App() {
                 }
               />
               <Route
+                path="/teacher/exams/:id/edit"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <EditExamPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/exams/submissions/:id"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <SubmissionDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/teacher/live-classes"
                 element={
                   <ProtectedRoute requiredRole="INSTRUCTOR">
@@ -341,7 +466,47 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              
+              <Route
+                path="/teacher/live"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <LiveManagementPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/live/:id"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <LiveStreamPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/discussions"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <DiscussionsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/discussions/:id"
+                element={
+                  <ProtectedRoute requiredRole="INSTRUCTOR">
+                    <AppLayout>
+                      <DiscussionDetailPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Admin routes - require ADMIN role */}
               <Route
                 path="/admin/dashboard"
@@ -466,9 +631,9 @@ function App() {
                 }
               />
 
-              {/* Default redirect - will be handled by ProtectedRoute */}
-              <Route path="/" element={<ProtectedRoute />} />
-              <Route path="*" element={<ProtectedRoute />} />
+              {/* 根路径和未匹配路径：根据角色自动重定向 */}
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="*" element={<RootRedirect />} />
             </Routes>
           </div>
         </Router>

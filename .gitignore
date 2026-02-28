@@ -52,3 +52,32 @@ coverage/
 # System files
 .DS_Store
 ehthumbs.db
+nul
+
+# Compiled binaries
+backend/server
+backend/server-linux
+
+# Database files (contain user data, do not commit)
+*.db
+backend/database/education.db
+backend/education.db
+
+# Uploaded user files (runtime generated)
+backend/public/assignments/
+backend/public/avatars/
+backend/public/covers/
+backend/public/materials/
+
+# Backup / temp files
+*.backup
+*.fixed
+test-claude-code.sh
+sample-exam.txt
+sample-outline.txt
+
+# Claude local session data
+.claude/
+
+# Misc local directories
+openclaw/

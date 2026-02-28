@@ -9,7 +9,8 @@ type Config struct {
 	ServerPort string
 	DBPath     string
 	JWTSecret  string
-	EnableSeed bool
+	EnableSeed      bool
+	AnthropicAPIKey string
 }
 
 // Load 加载配置
@@ -18,7 +19,8 @@ func Load() *Config {
 		ServerPort: getEnv("SERVER_PORT", "8080"),
 		DBPath:     getEnv("DB_PATH", "./database/education.db"),
 		JWTSecret:  getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
-		EnableSeed: getEnvBool("ENABLE_SEED", false),
+		EnableSeed:      getEnvBool("ENABLE_SEED", false),
+		AnthropicAPIKey: getEnv("ANTHROPIC_API_KEY", ""),
 	}
 }
 

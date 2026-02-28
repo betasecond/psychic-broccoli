@@ -44,7 +44,7 @@ export const fetchExams = createAsyncThunk(
   'exam/fetchExams',
   async (params?: { courseId?: number; page?: number; pageSize?: number }) => {
     const response = await examService.getExams(params)
-    return response.data.exams
+    return ((response as any)?.exams ?? []) as Exam[]
   }
 )
 
@@ -52,7 +52,7 @@ export const fetchMyExams = createAsyncThunk(
   'exam/fetchMyExams',
   async () => {
     const response = await examService.getMyExams()
-    return response.data.exams
+    return ((response as any)?.exams ?? []) as Exam[]
   }
 )
 
@@ -60,7 +60,7 @@ export const fetchExam = createAsyncThunk(
   'exam/fetchExam',
   async (id: number) => {
     const response = await examService.getExam(id)
-    return response.data
+    return response as any as { exam: Exam; questions: ExamQuestion[] }
   }
 )
 
@@ -116,7 +116,7 @@ export const submitExam = createAsyncThunk(
   'exam/submitExam',
   async ({ id, data }: { id: number; data: SubmitExamRequest }) => {
     const response = await examService.submitExam(id, data)
-    return response.data
+    return response as any
   }
 )
 
@@ -124,7 +124,7 @@ export const fetchResults = createAsyncThunk(
   'exam/fetchResults',
   async (id: number) => {
     const response = await examService.getExamResults(id)
-    return response.data
+    return (Array.isArray(response) ? response : (response as any)?.data ?? []) as ExamSubmission[]
   }
 )
 
@@ -132,7 +132,7 @@ export const fetchMySubmission = createAsyncThunk(
   'exam/fetchMySubmission',
   async (examId: number) => {
     const response = await examService.getMySubmission(examId)
-    return response.data
+    return response as any as ExamSubmission
   }
 )
 
@@ -140,7 +140,7 @@ export const fetchSubmissionDetail = createAsyncThunk(
   'exam/fetchSubmissionDetail',
   async (id: number) => {
     const response = await examService.getSubmissionDetail(id)
-    return response.data
+    return response as any as ExamSubmission
   }
 )
 
@@ -148,7 +148,7 @@ export const fetchStatistics = createAsyncThunk(
   'exam/fetchStatistics',
   async (id: number) => {
     const response = await examService.getExamStatistics(id)
-    return response.data
+    return response as any as ExamStatistics
   }
 )
 

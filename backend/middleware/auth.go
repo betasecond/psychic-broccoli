@@ -42,6 +42,42 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware 可选的JWT认证中间件
+// 如果有token就解析并设置用户信息，没有token也继续执行（作为游客）
+func OptionalAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			// 没有token，继续执行（作为游客）
+			c.Next()
+			return
+		}
+
+		// Bearer token格式
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			// token格式错误，继续执行（作为游客）
+			c.Next()
+			return
+		}
+
+		tokenString := parts[1]
+		claims, err := utils.ParseToken(tokenString)
+		if err != nil {
+			// token无效，继续执行（作为游客）
+			c.Next()
+			return
+		}
+
+		// 将用户信息存储到context中
+		c.Set("userID", claims.UserID)
+		c.Set("username", claims.Username)
+		c.Set("role", claims.Role)
+
+		c.Next()
+	}
+}
+
 // RequireRole 要求特定角色的中间件
 func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {

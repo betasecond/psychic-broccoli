@@ -11,6 +11,7 @@ import {
   UserOutlined,
   CalendarOutlined,
   MessageOutlined,
+  CommentOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../store'
@@ -69,6 +70,12 @@ const RoleBasedNavigation: React.FC = () => {
             icon: <CalendarOutlined />,
             label: '课程表',
             onClick: () => handleMenuClick('/student/schedule'),
+          },
+          {
+            key: '/student/discussions',
+            icon: <CommentOutlined />,
+            label: '课程讨论',
+            onClick: () => handleMenuClick('/student/discussions'),
           },
           {
             key: '/student/messages',
@@ -165,6 +172,12 @@ const RoleBasedNavigation: React.FC = () => {
             icon: <VideoCameraOutlined />,
             label: '直播教学',
             onClick: () => handleMenuClick('/teacher/live-classes'),
+          },
+          {
+            key: '/teacher/discussions',
+            icon: <CommentOutlined />,
+            label: '讨论管理',
+            onClick: () => handleMenuClick('/teacher/discussions'),
           },
           {
             key: '/teacher/analytics',

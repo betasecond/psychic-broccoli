@@ -39,7 +39,7 @@ export const fetchAssignments = createAsyncThunk(
   'assignment/fetchAssignments',
   async (params?: { courseId?: number; page?: number; pageSize?: number }) => {
     const response = await assignmentService.getAssignments(params)
-    return response.data.assignments
+    return ((response as any)?.assignments ?? []) as Assignment[]
   }
 )
 
@@ -47,7 +47,7 @@ export const fetchMyAssignments = createAsyncThunk(
   'assignment/fetchMyAssignments',
   async () => {
     const response = await assignmentService.getMyAssignments()
-    return response.data.assignments
+    return ((response as any)?.assignments ?? []) as Assignment[]
   }
 )
 
@@ -55,7 +55,7 @@ export const fetchAssignment = createAsyncThunk(
   'assignment/fetchAssignment',
   async (id: number) => {
     const response = await assignmentService.getAssignment(id)
-    return response.data
+    return response as unknown as Assignment
   }
 )
 
@@ -95,7 +95,7 @@ export const fetchSubmissions = createAsyncThunk(
   'assignment/fetchSubmissions',
   async (params?: { assignmentId?: number; studentId?: number }) => {
     const response = await assignmentService.getSubmissions(params)
-    return response.data
+    return (response as unknown as AssignmentSubmission[]) ?? []
   }
 )
 
@@ -103,7 +103,7 @@ export const fetchSubmissionDetail = createAsyncThunk(
   'assignment/fetchSubmissionDetail',
   async (id: number) => {
     const response = await assignmentService.getSubmissionDetail(id)
-    return response.data
+    return response as unknown as AssignmentSubmission
   }
 )
 
@@ -119,7 +119,7 @@ export const fetchStatistics = createAsyncThunk(
   'assignment/fetchStatistics',
   async (id: number) => {
     const response = await assignmentService.getAssignmentStatistics(id)
-    return response.data
+    return response as unknown as AssignmentStatistics
   }
 )
 

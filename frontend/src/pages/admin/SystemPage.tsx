@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Row, Col, Button, Typography, Space, Tabs, Statistic, Divider, Progress } from 'antd';
-import { SettingOutlined, DatabaseOutlined, CloudServerOutlined, SafetyCertificateOutlined, FileTextOutlined, ClockCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { SettingOutlined, DatabaseOutlined, CloudServerOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -109,36 +109,9 @@ const SystemPage: React.FC = () => {
                 <div style={{ padding: '24px' }}>
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Title level={4}>系统日志</Title>
-                        <Space>
-                          <Button>清空日志</Button>
-                          <Button type="primary">导出日志</Button>
-                        </Space>
-                      </div>
-                      
-                      <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: '4px', padding: '16px' }}>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '2px' }}>
-                          <Text type="success"><ClockCircleOutlined /> 2024-03-18 15:30:22</Text> - <Text>系统启动完成</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '2px' }}>
-                          <Text type="secondary"><ClockCircleOutlined /> 2024-03-18 15:28:15</Text> - <Text>数据库连接成功</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '2px' }}>
-                          <Text type="warning"><ExclamationCircleOutlined /> 2024-03-18 15:25:03</Text> - <Text>发现重复登录尝试: IP 192.168.1.100</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '2px' }}>
-                          <Text type="success"><ClockCircleOutlined /> 2024-03-18 15:20:45</Text> - <Text>用户 'admin' 登录成功</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '2px' }}>
-                          <Text type="secondary"><ClockCircleOutlined /> 2024-03-18 15:15:33</Text> - <Text>系统配置更新</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '2px' }}>
-                          <Text type="warning"><ExclamationCircleOutlined /> 2024-03-18 15:10:12</Text> - <Text>内存使用率超过80%</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '2px' }}>
-                          <Text type="success"><ClockCircleOutlined /> 2024-03-18 15:05:01</Text> - <Text>系统备份完成</Text>
-                        </div>
+                      <Title level={4}>系统日志</Title>
+                      <div style={{ padding: '32px', textAlign: 'center', border: '1px solid #f0f0f0', borderRadius: '4px', color: '#8c8c8c' }}>
+                        暂无系统日志记录
                       </div>
                     </div>
                   </Space>
@@ -163,22 +136,8 @@ const SystemPage: React.FC = () => {
 
                     <div>
                       <Title level={4}>备份历史</Title>
-                      <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: '4px', padding: '16px' }}>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '2px' }}>
-                          <Text><FileTextOutlined /> backup_20240318_020005.zip</Text> - <Text type="secondary">2.4 GB</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f0f2f5', border: '1px solid #d9d9d9', borderRadius: '2px' }}>
-                          <Text><FileTextOutlined /> backup_20240317_020004.zip</Text> - <Text type="secondary">2.3 GB</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f0f2f5', border: '1px solid #d9d9d9', borderRadius: '2px' }}>
-                          <Text><FileTextOutlined /> backup_20240316_020003.zip</Text> - <Text type="secondary">2.3 GB</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f0f2f5', border: '1px solid #d9d9d9', borderRadius: '2px' }}>
-                          <Text><FileTextOutlined /> backup_20240315_020002.zip</Text> - <Text type="secondary">2.3 GB</Text>
-                        </div>
-                        <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f0f2f5', border: '1px solid #d9d9d9', borderRadius: '2px' }}>
-                          <Text><FileTextOutlined /> backup_20240314_020001.zip</Text> - <Text type="secondary">2.3 GB</Text>
-                        </div>
+                      <div style={{ padding: '32px', textAlign: 'center', border: '1px solid #f0f0f0', borderRadius: '4px', color: '#8c8c8c' }}>
+                        暂无备份记录
                       </div>
                     </div>
 

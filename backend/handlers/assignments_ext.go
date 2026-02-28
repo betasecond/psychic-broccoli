@@ -12,8 +12,34 @@ import (
 // GetAssignmentStatistics 获取作业统计信息
 func GetAssignmentStatistics(c *gin.Context) {
 	assignmentID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
 
-	// 获取选课学生总数
+	// 只允许教师和管理员访问
+	if role == "STUDENT" {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
+
+	// 教师只能查看自己课程的统计
+	if role == "INSTRUCTOR" {
+		var instructorID int64
+		err := database.DB.QueryRow(`
+			SELECT c.instructor_id FROM assignments a
+			JOIN courses c ON a.course_id = c.id
+			WHERE a.id = ?
+		`, assignmentID).Scan(&instructorID)
+		if err != nil {
+			utils.NotFound(c, "作业不存在")
+			return
+		}
+		if instructorID != userID.(int64) {
+			utils.Forbidden(c, "权限不足")
+			return
+		}
+	}
+
+	// 获取当前选课学生总数
 	var totalStudents int
 	err := database.DB.QueryRow(`
 		SELECT COUNT(DISTINCT ce.student_id)
@@ -27,10 +53,14 @@ func GetAssignmentStatistics(c *gin.Context) {
 		return
 	}
 
-	// 获取已提交数
+	// 只统计当前已选课学生的提交数，避免已退课学生导致数据异常
 	var submitted int
 	database.DB.QueryRow(`
-		SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id = ?
+		SELECT COUNT(DISTINCT s.student_id)
+		FROM assignment_submissions s
+		JOIN assignments a ON s.assignment_id = a.id
+		JOIN course_enrollments ce ON s.student_id = ce.student_id AND a.course_id = ce.course_id
+		WHERE s.assignment_id = ?
 	`, assignmentID).Scan(&submitted)
 
 	// 获取已批改数和平均分
@@ -153,6 +183,8 @@ func GetMyAssignments(c *gin.Context) {
 // GetSubmissionDetail 获取作业提交详情
 func GetSubmissionDetail(c *gin.Context) {
 	submissionID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
 
 	var submission struct {
 		ID           int64
@@ -182,6 +214,25 @@ func GetSubmissionDetail(c *gin.Context) {
 	if err != nil {
 		utils.InternalServerError(c, "查询失败")
 		return
+	}
+
+	// Fix P1: 权限校验
+	if role == "STUDENT" && userID.(int64) != submission.StudentID {
+		utils.Forbidden(c, "只能查看自己的提交记录")
+		return
+	}
+	if role == "INSTRUCTOR" {
+		var instructorID int64
+		database.DB.QueryRow(`
+			SELECT c.instructor_id FROM assignment_submissions s
+			JOIN assignments a ON s.assignment_id = a.id
+			JOIN courses c ON a.course_id = c.id
+			WHERE s.id = ?
+		`, submissionID).Scan(&instructorID)
+		if instructorID != userID.(int64) {
+			utils.Forbidden(c, "只能查看自己课程的提交记录")
+			return
+		}
 	}
 
 	// 获取学生信息

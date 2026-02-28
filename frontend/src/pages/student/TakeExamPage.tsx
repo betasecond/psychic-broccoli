@@ -105,7 +105,7 @@ const TakeExamPage: React.FC = () => {
     const questionNumber = index + 1;
     
     return (
-      <Card key={question.id} style={{ marginBottom: '24px' }}>
+      <Card key={question.id} id={`question-${question.id}`} style={{ marginBottom: '24px' }}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>
             <Text strong style={{ fontSize: '16px' }}>

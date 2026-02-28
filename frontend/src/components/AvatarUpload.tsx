@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Upload, Avatar, Button, message, Progress, Modal } from 'antd'
 import { CameraOutlined, UserOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd'
-import { authService } from '../services/authService'
+import { uploadFile } from '../services/fileService'
 import ImageCropper from './ImageCropper'
 import './AvatarUpload.css'
 
@@ -45,7 +45,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       setCropperVisible(true)
     }
     reader.readAsDataURL(file)
-    
+
     return false // Prevent automatic upload
   }
 
@@ -65,64 +65,21 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
     setPreviewVisible(true)
   }
 
-  const uploadToOSS = async (file: File, credentials: any): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const fileName = `avatars/${Date.now()}-${file.name}`
-      const ossUrl = `https://${credentials.bucketName}.${credentials.region}.aliyuncs.com`
-      
-      // Create FormData for OSS upload
-      const formData = new FormData()
-      formData.append('key', fileName)
-      formData.append('OSSAccessKeyId', credentials.accessKeyId)
-      formData.append('policy', credentials.policy || credentials.securityToken)
-      formData.append('Signature', credentials.signature || credentials.accessKeySecret)
-      formData.append('success_action_status', '200')
-      formData.append('file', file)
-
-      // Create XMLHttpRequest for progress tracking
-      const xhr = new XMLHttpRequest()
-      
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100)
-          setUploadProgress(progress)
-        }
-      })
-
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          const uploadedUrl = `${ossUrl}/${fileName}`
-          resolve(uploadedUrl)
-        } else {
-          reject(new Error(`Upload failed with status: ${xhr.status}`))
-        }
-      })
-
-      xhr.addEventListener('error', () => {
-        reject(new Error('Upload failed'))
-      })
-
-      xhr.open('POST', ossUrl)
-      xhr.send(formData)
-    })
-  }
-
   const handleCroppedImageUpload = async (croppedFile: File) => {
     try {
       setUploading(true)
       setUploadProgress(0)
       setCropperVisible(false)
-      
-      // Get OSS upload credentials
-      const credentials = await authService.getOssUploadCredentials()
-      
-      // Upload to OSS
-      const uploadedUrl = await uploadToOSS(croppedFile, credentials)
-      
-      // Call success callback
-      onUploadSuccess?.(uploadedUrl)
+
+      // 上传到本地后端
+      const result = await uploadFile(croppedFile, 'avatar', (percent) => {
+        setUploadProgress(percent)
+      })
+
+      // Call success callback with the returned URL
+      onUploadSuccess?.(result.url)
       message.success('头像上传成功')
-      
+
     } catch (error) {
       console.error('Avatar upload error:', error)
       message.error('头像上传失败，请重试')
@@ -177,14 +134,14 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       >
         {uploadButton}
       </Upload>
-      
+
       <ImageCropper
         visible={cropperVisible}
         imageSrc={selectedImage}
         onCancel={() => setCropperVisible(false)}
         onConfirm={handleCroppedImageUpload}
       />
-      
+
       <Modal
         open={previewVisible}
         title="头像预览"

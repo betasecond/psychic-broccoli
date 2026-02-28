@@ -29,7 +29,7 @@ type SubmitAssignmentRequest struct {
 
 // GradeAssignmentRequest 批改作业请求
 type GradeAssignmentRequest struct {
-	Grade    float64 `json:"grade" binding:"required"`
+	Grade    float64 `json:"grade" binding:"required,min=0,max=100"`
 	Feedback *string `json:"feedback"`
 }
 
@@ -38,8 +38,30 @@ func GetAssignments(c *gin.Context) {
 	courseID := c.Query("courseId")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
 
 	offset := (page - 1) * pageSize
+
+	// 学生需要校验选课状态
+	if role == "STUDENT" {
+		if courseID == "" {
+			utils.BadRequest(c, "学生查询需要指定课程ID")
+			return
+		}
+
+		// 检查是否选了这门课
+		var count int
+		database.DB.QueryRow(`
+			SELECT COUNT(*) FROM course_enrollments
+			WHERE student_id = ? AND course_id = ?
+		`, userID, courseID).Scan(&count)
+
+		if count == 0 {
+			utils.Forbidden(c, "您未选修此课程")
+			return
+		}
+	}
 
     query := `
         SELECT id, course_id, title, content, deadline, created_at, attachments
@@ -121,10 +143,16 @@ func CreateAssignment(c *gin.Context) {
 	// 解析deadline
     var deadline *time.Time
 	if req.Deadline != nil && *req.Deadline != "" {
-		t, err := time.Parse(time.RFC3339, *req.Deadline)
-		if err == nil {
-			deadline = &t
+		t, parseErr := time.Parse(time.RFC3339, *req.Deadline)
+		if parseErr != nil {
+			utils.BadRequest(c, "截止日期格式错误，请使用 ISO 8601 格式")
+			return
 		}
+		if t.Before(time.Now()) {
+			utils.BadRequest(c, "截止日期不能早于当前时间")
+			return
+		}
+		deadline = &t
 	}
 
     // 处理附件为 JSON 字符串
@@ -156,6 +184,8 @@ func CreateAssignment(c *gin.Context) {
 // GetAssignment 获取作业详情
 func GetAssignment(c *gin.Context) {
 	assignmentID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
 
 	var assignment models.Assignment
 	var deadline sql.NullTime
@@ -181,6 +211,29 @@ func GetAssignment(c *gin.Context) {
 		assignment.Deadline = &deadline.Time
 	}
 
+	// Fix P1: 权限校验 - 学生须选课，教师须是课程教师
+	if role == "STUDENT" {
+		var cnt int
+		database.DB.QueryRow(
+			"SELECT COUNT(*) FROM course_enrollments WHERE student_id = ? AND course_id = ?",
+			userID, assignment.CourseID,
+		).Scan(&cnt)
+		if cnt == 0 {
+			utils.Forbidden(c, "您未选修此课程")
+			return
+		}
+	} else if role == "INSTRUCTOR" {
+		var instructorID int64
+		database.DB.QueryRow(
+			"SELECT instructor_id FROM courses WHERE id = ?",
+			assignment.CourseID,
+		).Scan(&instructorID)
+		if instructorID != userID.(int64) {
+			utils.Forbidden(c, "权限不足")
+			return
+		}
+	}
+
 	utils.Success(c, assignment)
 }
 
@@ -201,15 +254,30 @@ func SubmitAssignment(c *gin.Context) {
 		return
 	}
 
-	// 检查作业是否存在
+	// Fix P2: 内容和附件不能同时为空
+	contentEmpty := req.Content == nil || *req.Content == ""
+	attachmentsEmpty := req.Attachments == nil || *req.Attachments == ""
+	if contentEmpty && attachmentsEmpty {
+		utils.BadRequest(c, "作业内容和附件不能同时为空")
+		return
+	}
+
+	// 检查作业是否存在及截止日期
 	var courseID int64
-	err := database.DB.QueryRow("SELECT course_id FROM assignments WHERE id = ?", assignmentID).Scan(&courseID)
+	var deadline sql.NullTime
+	err := database.DB.QueryRow("SELECT course_id, deadline FROM assignments WHERE id = ?", assignmentID).Scan(&courseID, &deadline)
 	if err == sql.ErrNoRows {
 		utils.NotFound(c, "作业不存在")
 		return
 	}
 	if err != nil {
 		utils.InternalServerError(c, "服务器错误")
+		return
+	}
+
+	// Fix P0: 检查截止日期
+	if deadline.Valid && time.Now().After(deadline.Time) {
+		utils.BadRequest(c, "已超过截止日期，无法提交")
 		return
 	}
 
@@ -233,6 +301,13 @@ func SubmitAssignment(c *gin.Context) {
 	`, assignmentID, userID).Scan(&submissionID)
 
 	if err == nil {
+		// Fix P1: 已批改则不允许重新提交
+		var gradeVal sql.NullFloat64
+		database.DB.QueryRow("SELECT grade FROM assignment_submissions WHERE id = ?", submissionID).Scan(&gradeVal)
+		if gradeVal.Valid {
+			utils.BadRequest(c, "作业已批改，不可重新提交")
+			return
+		}
 		// 已存在,更新
 		_, err = database.DB.Exec(`
 			UPDATE assignment_submissions 
@@ -259,11 +334,51 @@ func SubmitAssignment(c *gin.Context) {
 func GetSubmissions(c *gin.Context) {
 	assignmentID := c.Query("assignmentId")
 	studentID := c.Query("studentId")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+
+	// 权限校验
+	if role == "STUDENT" {
+		// 学生只能查看自己的提交记录
+		userIDStr := strconv.FormatInt(userID.(int64), 10)
+		if studentID == "" || studentID != userIDStr {
+			utils.Forbidden(c, "只能查看自己的提交记录")
+			return
+		}
+	} else if role == "INSTRUCTOR" {
+		// 教师只能查看自己课程的提交记录
+		if assignmentID == "" {
+			utils.BadRequest(c, "教师查询需要指定作业ID")
+			return
+		}
+
+		// 验证教师是否为该作业所属课程的教师
+		var courseID, instructorID int64
+		err := database.DB.QueryRow(`
+			SELECT a.course_id, c.instructor_id
+			FROM assignments a
+			JOIN courses c ON a.course_id = c.id
+			WHERE a.id = ?
+		`, assignmentID).Scan(&courseID, &instructorID)
+
+		if err != nil {
+			utils.InternalServerError(c, "服务器错误")
+			return
+		}
+
+		if instructorID != userID.(int64) {
+			utils.Forbidden(c, "只能查看自己课程的作业提交")
+			return
+		}
+	}
+	// ADMIN 可以查看所有提交记录，不需要额外校验
 
 	query := `
 		SELECT s.id, s.assignment_id, s.student_id, s.content, s.attachments,
-		       s.submitted_at, s.grade, s.feedback
+		       s.submitted_at, s.grade, s.feedback,
+		       COALESCE(u.username, '') as student_name
 		FROM assignment_submissions s
+		LEFT JOIN users u ON s.student_id = u.id
 		WHERE 1=1
 	`
 	args := []interface{}{}
@@ -289,13 +404,18 @@ func GetSubmissions(c *gin.Context) {
 	submissions := []models.AssignmentSubmission{}
 	for rows.Next() {
 		var submission models.AssignmentSubmission
+		var studentName string
 		err := rows.Scan(
 			&submission.ID, &submission.AssignmentID, &submission.StudentID,
 			&submission.Content, &submission.Attachments, &submission.SubmittedAt,
 			&submission.Grade, &submission.Feedback,
+			&studentName,
 		)
 		if err != nil {
 			continue
+		}
+		if studentName != "" {
+			submission.StudentName = &studentName
 		}
 		submissions = append(submissions, submission)
 	}

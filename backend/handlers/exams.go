@@ -24,7 +24,7 @@ type AddQuestionRequest struct {
 	Type       string  `json:"type" binding:"required"` // SINGLE_CHOICE, MULTIPLE_CHOICE, TRUE_FALSE, SHORT_ANSWER
 	Stem       string  `json:"stem" binding:"required"`
 	Options    *string `json:"options"`    // JSON字符串
-	Answer     string  `json:"answer" binding:"required"` // JSON字符串
+	Answer     string  `json:"answer"` // JSON字符串（简答题可为空）
 	Score      float64 `json:"score" binding:"required"`
 	OrderIndex int     `json:"orderIndex"`
 }
@@ -134,6 +134,11 @@ func CreateExam(c *gin.Context) {
 	endTime, err := time.Parse(time.RFC3339, req.EndTime)
 	if err != nil {
 		utils.BadRequest(c, "结束时间格式错误")
+		return
+	}
+
+	if !endTime.After(startTime) {
+		utils.BadRequest(c, "结束时间必须晚于开始时间")
 		return
 	}
 
@@ -359,11 +364,11 @@ func SubmitExam(c *gin.Context) {
 	// 保存答案并自动判分
 	totalScore := 0.0
 	for _, answer := range req.Answers {
-		// 获取题目信息
+		// 获取题目信息，同时验证题目属于当前考试（防止注入其他考试的题目）
 		var question models.ExamQuestion
 		err := database.DB.QueryRow(`
-			SELECT id, type, answer, score FROM exam_questions WHERE id = ?
-		`, answer.QuestionID).Scan(
+			SELECT id, type, answer, score FROM exam_questions WHERE id = ? AND exam_id = ?
+		`, answer.QuestionID, examID).Scan(
 			&question.ID, &question.Type, &question.Answer, &question.Score,
 		)
 

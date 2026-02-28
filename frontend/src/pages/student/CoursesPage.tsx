@@ -111,7 +111,7 @@ const CoursesPage: React.FC = () => {
           <Card>
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Space>
-                <Button type="primary" onClick={() => navigate('/student/courses/all')}>
+                <Button type="primary" onClick={() => navigate('/student/courses/browse')}>
                   报名新课程
                 </Button>
               </Space>

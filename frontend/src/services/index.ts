@@ -6,6 +6,9 @@ export { examService } from './examService'
 export { courseService } from './courseService'
 export { userService } from './userService'
 export { messageService } from './messageService'
+export { progressService } from './progressService'
+export { liveService } from './liveService'
+export { discussionService } from './discussionService'
 
 // Export types
 export type {
@@ -57,3 +60,18 @@ export type {
   Discussion,
   MarkMessageStatusRequest,
 } from './messageService'
+
+export type {
+  LiveSession,
+  LiveMessage,
+  CreateLiveRequest,
+  SendMessageRequest,
+} from './liveService'
+
+export type {
+  Discussion as DiscussionType,
+  DiscussionReply,
+  DiscussionDetail,
+  CreateDiscussionRequest,
+  ReplyDiscussionRequest,
+} from './discussionService'

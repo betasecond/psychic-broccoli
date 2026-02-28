@@ -1,219 +1,144 @@
-import React from 'react';
-import { Card, Row, Col, Button, Typography, Space, Form, Input, Select, DatePicker, InputNumber, message, Divider } from 'antd';
-import { BarChartOutlined, BookOutlined, CalendarOutlined, EditOutlined, TagsOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import {
+  Card, Row, Col, Button, Typography, Space, Form, Input, Select, message,
+} from 'antd';
+import { DatePicker } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { examService, type CreateExamRequest } from '../../../services/examService';
+import { courseService, type Course } from '../../../services/courseService';
+import { useAppSelector } from '../../../store';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
-const { TextArea } = Input;
+const { RangePicker } = DatePicker;
 
 const CreateExamPage: React.FC = () => {
   const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const currentUser = useAppSelector((state: any) => state.auth.user);
 
-  const onFinish = (values: any) => {
-    console.log('Received values:', values);
-    message.success('考试创建成功！');
-    form.resetFields();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.userId) return;
+    loadCourses();
+  }, [currentUser?.userId]);
+
+  const loadCourses = async () => {
+    setCoursesLoading(true);
+    try {
+      const res = await courseService.getCourses({ instructorId: currentUser.userId }) as any;
+      setCourses(res?.courses || []);
+    } catch {
+      message.error('加载课程列表失败');
+    } finally {
+      setCoursesLoading(false);
+    }
   };
 
-  const onFinishFailed = (errorInfo: any) => {
-    console.log('Failed:', errorInfo);
+  const onFinish = async (values: any) => {
+    const [startMoment, endMoment] = values.timeRange;
+    const payload: CreateExamRequest = {
+      courseId: values.courseId,
+      title: values.title,
+      startTime: startMoment.toISOString(),
+      endTime: endMoment.toISOString(),
+    };
+    setSubmitting(true);
+    try {
+      await examService.createExam(payload);
+      message.success('考试创建成功');
+      navigate('/teacher/exams/list');
+    } catch {
+      message.error('创建考试失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <Title level={2}>创建考试</Title>
-        <Text type="secondary">创建新的课程考试</Text>
+        <Title level={2} style={{ margin: 0 }}>创建考试</Title>
+        <Text type="secondary">为课程创建一场新考试</Text>
       </div>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} md={18}>
+        <Col xs={24} md={16}>
           <Card title="考试信息">
             <Form
               form={form}
-              name="create-exam"
-              onFinish={onFinish}
-              onFinishFailed={onFinishFailed}
-              autoComplete="off"
               layout="vertical"
+              onFinish={onFinish}
+              autoComplete="off"
             >
               <Form.Item
                 name="title"
                 label="考试标题"
-                rules={[{ required: true, message: '请输入考试标题!' }]}
+                rules={[{ required: true, message: '请输入考试标题' }]}
               >
-                <Input placeholder="请输入考试标题，如：React 基础测试" />
+                <Input placeholder="例如：期中考试" maxLength={100} showCount />
               </Form.Item>
 
               <Form.Item
-                name="course"
+                name="courseId"
                 label="所属课程"
-                rules={[{ required: true, message: '请选择所属课程!' }]}
-              >
-                <Select placeholder="请选择课程">
-                  <Option value="react">React 深入浅出</Option>
-                  <Option value="typescript">TypeScript 实战</Option>
-                  <Option value="frontend">前端开发基础</Option>
-                  <Option value="javascript">JavaScript 高级编程</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="description"
-                label="考试说明"
-                rules={[{ required: true, message: '请输入考试说明!' }]}
-              >
-                <TextArea 
-                  rows={6} 
-                  placeholder="详细描述考试内容、形式、注意事项等信息" 
-                />
-              </Form.Item>
-
-              <Row gutter={16}>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="examDate"
-                    label="考试日期"
-                    rules={[{ required: true, message: '请选择考试日期!' }]}
-                  >
-                    <DatePicker style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="duration"
-                    label="考试时长(分钟)"
-                    rules={[{ required: true, message: '请输入考试时长!' }]}
-                  >
-                    <InputNumber min={30} max={300} placeholder="如：90" style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="totalScore"
-                    label="总分"
-                    rules={[{ required: true, message: '请输入总分!' }]}
-                  >
-                    <InputNumber min={1} max={100} placeholder="如：100" style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    name="passScore"
-                    label="及格分数"
-                    rules={[{ required: true, message: '请输入及格分数!' }]}
-                  >
-                    <InputNumber min={1} max={100} placeholder="如：60" style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item
-                name="type"
-                label="考试类型"
-                rules={[{ required: true, message: '请选择考试类型!' }]}
-              >
-                <Select placeholder="请选择考试类型">
-                  <Option value="期中考试">期中考试</Option>
-                  <Option value="期末考试">期末考试</Option>
-                  <Option value="单元测试">单元测试</Option>
-                  <Option value="随堂测验">随堂测验</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="difficulty"
-                label="难度等级"
-                rules={[{ required: true, message: '请选择难度等级!' }]}
-              >
-                <Select placeholder="请选择难度等级">
-                  <Option value="简单">简单</Option>
-                  <Option value="中等">中等</Option>
-                  <Option value="困难">困难</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="instructions"
-                label="考试须知"
-              >
-                <TextArea 
-                  rows={4} 
-                  placeholder="描述考试规则、注意事项、禁止行为等" 
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="tags"
-                label="标签"
+                rules={[{ required: true, message: '请选择课程' }]}
               >
                 <Select
-                  mode="tags"
-                  style={{ width: '100%' }}
-                  placeholder="输入考试相关标签"
-                  dropdownRender={() => null}
+                  placeholder="请选择课程"
+                  loading={coursesLoading}
+                  showSearch
+                  optionFilterProp="children"
                 >
+                  {courses.map((c) => (
+                    <Select.Option key={c.id} value={c.id}>
+                      {c.title}
+                    </Select.Option>
+                  ))}
                 </Select>
               </Form.Item>
 
-              <Form.Item>
+              <Form.Item
+                name="timeRange"
+                label="考试时间段"
+                rules={[{ required: true, message: '请选择考试开始和结束时间' }]}
+              >
+                <RangePicker
+                  showTime
+                  format="YYYY-MM-DD HH:mm"
+                  style={{ width: '100%' }}
+                  placeholder={['开始时间', '结束时间']}
+                />
+              </Form.Item>
+
+              <Form.Item style={{ marginBottom: 0 }}>
                 <Space>
-                  <Button type="primary" htmlType="submit">
+                  <Button type="primary" htmlType="submit" loading={submitting}>
                     创建考试
                   </Button>
-                  <Button>保存草稿</Button>
-                  <Button>预览</Button>
+                  <Button onClick={() => navigate('/teacher/exams/list')}>
+                    取消
+                  </Button>
                 </Space>
               </Form.Item>
             </Form>
           </Card>
         </Col>
 
-        <Col xs={24} md={6}>
-          <Card title="考试设置">
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <BarChartOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-                  <Text strong>考试信息</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  填写考试基本信息
-                </Text>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <CalendarOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
-                  <Text strong>时间安排</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  设置考试日期和时长
-                </Text>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <EditOutlined style={{ color: '#fa8c16', marginRight: '8px' }} />
-                  <Text strong>评分标准</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  定义总分和及格线
-                </Text>
-              </div>
-              
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <ClockCircleOutlined style={{ color: '#722ed1', marginRight: '8px' }} />
-                  <Text strong>考试规则</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  设置考试规则
-                </Text>
-              </div>
+        <Col xs={24} md={8}>
+          <Card title="说明">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text type="secondary">
+                创建考试后，您可以在考试列表中为考试添加题目。
+              </Text>
+              <Text type="secondary">
+                考试开始后，学生可以在「我的考试」页面参加考试。
+              </Text>
+              <Text type="secondary">
+                考试结束后，系统会自动批改客观题并统计成绩。
+              </Text>
             </Space>
           </Card>
         </Col>

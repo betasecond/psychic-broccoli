@@ -167,35 +167,3 @@ func GetNotifications(c *gin.Context) {
 
 	utils.Success(c, notifications)
 }
-
-// GetDiscussions 获取课程讨论列表
-func GetDiscussions(c *gin.Context) {
-	// 执行查询
-	rows, err := database.DB.Query(`
-		SELECT id, title, course, author, replies, last_reply, status, created_at
-		FROM discussions
-		ORDER BY created_at DESC
-	`)
-	if err != nil {
-		utils.InternalServerError(c, "获取讨论失败")
-		return
-	}
-	defer rows.Close()
-
-	// 解析结果
-	var discussions []models.Discussion
-	for rows.Next() {
-		var discussion models.Discussion
-		if err := rows.Scan(
-			&discussion.ID, &discussion.Title, &discussion.Course,
-			&discussion.Author, &discussion.Replies, &discussion.LastReply,
-			&discussion.Status, &discussion.CreatedAt,
-		); err != nil {
-			utils.InternalServerError(c, "解析讨论失败")
-			return
-		}
-		discussions = append(discussions, discussion)
-	}
-
-	utils.Success(c, discussions)
-}

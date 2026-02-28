@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,7 @@ type CreateCourseRequest struct {
 
 // UpdateCourseRequest 更新课程请求
 type UpdateCourseRequest struct {
-	Title         string  `json:"title"`
+	Title         string  `json:"title" binding:"required"`
 	Description   string  `json:"description"`
 	CoverImageURL *string `json:"coverImageUrl"`
 	CategoryID    *int64  `json:"categoryId"`
@@ -42,26 +43,72 @@ func GetCourses(c *gin.Context) {
 	status := c.Query("status")
 	categoryID := c.Query("categoryId")
 	instructorID := c.Query("instructorId")
+	role, _ := c.Get("role")
+	userID, _ := c.Get("userID")
+
+	// DEBUG: 输出调试信息
+	fmt.Printf("[DEBUG] GetCourses - role type: %T, role value: %v, userID: %v\n", role, role, userID)
+
+	// 处理role的类型断言，如果为nil则视为未认证的游客
+	var roleStr string
+	if role != nil {
+		roleStr = role.(string)
+	} else {
+		roleStr = "GUEST" // 未认证用户视为游客
+	}
 
 	offset := (page - 1) * pageSize
 
-	// 构建查询
+	// 构建查询 - 如果是学生，直接在查询中JOIN course_enrollments获取enrolled状态
 	query := `
-		SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id, 
-		       u.username as instructor_name, c.category_id, 
-		       COALESCE(cat.name, '') as category_name, 
-		       c.status, c.created_at, c.updated_at
+		SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id,
+		       u.username as instructor_name, c.category_id,
+		       COALESCE(cat.name, '') as category_name,
+		       c.status, c.created_at, c.updated_at`
+
+	// 如果是学生，添加enrolled字段到SELECT中
+	if roleStr == "STUDENT" && userID != nil {
+		query += `,
+		       CASE WHEN ce.id IS NOT NULL THEN 1 ELSE 0 END as enrolled`
+	}
+
+	query += `
 		FROM courses c
 		LEFT JOIN users u ON c.instructor_id = u.id
-		LEFT JOIN course_categories cat ON c.category_id = cat.id
+		LEFT JOIN course_categories cat ON c.category_id = cat.id`
+
+	// 如果是学生，LEFT JOIN course_enrollments表
+	if roleStr == "STUDENT" && userID != nil {
+		query += `
+		LEFT JOIN course_enrollments ce ON c.id = ce.course_id AND ce.student_id = ?`
+	}
+
+	query += `
 		WHERE 1=1
 	`
 	args := []interface{}{}
 
+	// 如果是学生，添加userID到args
+	if roleStr == "STUDENT" && userID != nil {
+		args = append(args, userID)
+	}
+
+	// 权限过滤：如果没有指定status，根据角色设置默认值
 	if status != "" {
 		query += " AND c.status = ?"
 		args = append(args, status)
+	} else {
+		// 游客和学生只能看到已发布的课程
+		if roleStr == "GUEST" || roleStr == "STUDENT" {
+			query += " AND c.status = 'PUBLISHED'"
+		} else if roleStr == "INSTRUCTOR" {
+			// 教师可以看到自己的所有状态课程，或其他人已发布的课程
+			query += " AND (c.instructor_id = ? OR c.status = 'PUBLISHED')"
+			args = append(args, userID)
+		}
+		// ADMIN 可以看到所有课程，不需要额外过滤
 	}
+
 	if categoryID != "" {
 		query += " AND c.category_id = ?"
 		args = append(args, categoryID)
@@ -84,24 +131,52 @@ func GetCourses(c *gin.Context) {
 	courses := []models.Course{}
 	for rows.Next() {
 		var course models.Course
-		err := rows.Scan(
-			&course.ID, &course.Title, &course.Description, &course.CoverImageURL,
-			&course.InstructorID, &course.InstructorName, &course.CategoryID,
-			&course.CategoryName, &course.Status, &course.CreatedAt, &course.UpdatedAt,
-		)
-		if err != nil {
-			continue
+
+		// 如果是学生，Scan时包含enrolled字段
+		if roleStr == "STUDENT" && userID != nil {
+			var enrolledInt int
+			err := rows.Scan(
+				&course.ID, &course.Title, &course.Description, &course.CoverImageURL,
+				&course.InstructorID, &course.InstructorName, &course.CategoryID,
+				&course.CategoryName, &course.Status, &course.CreatedAt, &course.UpdatedAt,
+				&enrolledInt,
+			)
+			if err != nil {
+				fmt.Printf("[ERROR] Failed to scan course row: %v\n", err)
+				continue
+			}
+			course.Enrolled = enrolledInt == 1
+		} else {
+			err := rows.Scan(
+				&course.ID, &course.Title, &course.Description, &course.CoverImageURL,
+				&course.InstructorID, &course.InstructorName, &course.CategoryID,
+				&course.CategoryName, &course.Status, &course.CreatedAt, &course.UpdatedAt,
+			)
+			if err != nil {
+				fmt.Printf("[ERROR] Failed to scan course row: %v\n", err)
+				continue
+			}
 		}
+
 		courses = append(courses, course)
 	}
 
-	// 获取总数
+	// 获取总数（使用相同的过滤条件）
 	countQuery := "SELECT COUNT(*) FROM courses WHERE 1=1"
 	countArgs := []interface{}{}
+
 	if status != "" {
 		countQuery += " AND status = ?"
 		countArgs = append(countArgs, status)
+	} else {
+		if roleStr == "GUEST" || roleStr == "STUDENT" {
+			countQuery += " AND status = 'PUBLISHED'"
+		} else if roleStr == "INSTRUCTOR" {
+			countQuery += " AND (instructor_id = ? OR status = 'PUBLISHED')"
+			countArgs = append(countArgs, userID)
+		}
 	}
+
 	if categoryID != "" {
 		countQuery += " AND category_id = ?"
 		countArgs = append(countArgs, categoryID)
@@ -164,12 +239,49 @@ func CreateCourse(c *gin.Context) {
 // GetCourse 获取课程详情
 func GetCourse(c *gin.Context) {
 	courseID := c.Param("id")
+	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
 
 	var course models.Course
+
+	// 学生查询时同时检查选课状态
+	if role == "STUDENT" && userID != nil {
+		var enrolledInt int
+		err := database.DB.QueryRow(`
+			SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id,
+			       u.username as instructor_name, c.category_id,
+			       COALESCE(cat.name, '') as category_name,
+			       c.status, c.created_at, c.updated_at,
+			       CASE WHEN ce.id IS NOT NULL THEN 1 ELSE 0 END as enrolled
+			FROM courses c
+			LEFT JOIN users u ON c.instructor_id = u.id
+			LEFT JOIN course_categories cat ON c.category_id = cat.id
+			LEFT JOIN course_enrollments ce ON c.id = ce.course_id AND ce.student_id = ?
+			WHERE c.id = ?
+		`, userID, courseID).Scan(
+			&course.ID, &course.Title, &course.Description, &course.CoverImageURL,
+			&course.InstructorID, &course.InstructorName, &course.CategoryID,
+			&course.CategoryName, &course.Status, &course.CreatedAt, &course.UpdatedAt,
+			&enrolledInt,
+		)
+		if err == sql.ErrNoRows {
+			utils.NotFound(c, "课程不存在")
+			return
+		}
+		if err != nil {
+			utils.InternalServerError(c, "查询失败")
+			return
+		}
+		course.Enrolled = enrolledInt == 1
+		utils.Success(c, course)
+		return
+	}
+
+	// 非学生：不含选课状态
 	err := database.DB.QueryRow(`
-		SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id, 
-		       u.username as instructor_name, c.category_id, 
-		       COALESCE(cat.name, '') as category_name, 
+		SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id,
+		       u.username as instructor_name, c.category_id,
+		       COALESCE(cat.name, '') as category_name,
 		       c.status, c.created_at, c.updated_at
 		FROM courses c
 		LEFT JOIN users u ON c.instructor_id = u.id
@@ -376,6 +488,17 @@ func CreateChapter(c *gin.Context) {
 	var req CreateChapterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "请求参数错误")
+		return
+	}
+
+	// 检查 order_index 是否已被占用
+	var existingCount int
+	database.DB.QueryRow(
+		"SELECT COUNT(*) FROM course_chapters WHERE course_id = ? AND order_index = ?",
+		courseID, req.OrderIndex,
+	).Scan(&existingCount)
+	if existingCount > 0 {
+		utils.BadRequest(c, "该排序位置已被占用")
 		return
 	}
 

@@ -29,6 +29,7 @@ type Course struct {
 	CategoryID     *int64    `json:"categoryId,omitempty"`
 	CategoryName   string    `json:"categoryName,omitempty"` // 关联查询
 	Status         string    `json:"status"` // DRAFT, PUBLISHED, ARCHIVED
+	Enrolled       bool      `json:"enrolled"` // 是否已选修（仅学生）- 移除omitempty以确保false值也被序列化
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
@@ -89,6 +90,7 @@ type AssignmentSubmission struct {
 	SubmittedAt  time.Time `json:"submittedAt"`
 	Grade        *float64  `json:"grade,omitempty"`
 	Feedback     *string   `json:"feedback,omitempty"`
+	StudentName  *string   `json:"studentName,omitempty"`
 }
 
 // Exam 考试模型
