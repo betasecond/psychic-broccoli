@@ -31,6 +31,15 @@ func SuccessWithMessage(c *gin.Context, message string, data interface{}) {
 	})
 }
 
+// SuccessWithCode 成功响应带自定义状态码
+func SuccessWithCode(c *gin.Context, code int, data interface{}) {
+	c.JSON(code, Response{
+		Code:    0,
+		Message: "success",
+		Data:    data,
+	})
+}
+
 // Error 错误响应
 func Error(c *gin.Context, code int, message string) {
 	c.JSON(code, Response{
@@ -66,6 +75,24 @@ func Forbidden(c *gin.Context, message string) {
 // NotFound 404错误
 func NotFound(c *gin.Context, message string) {
 	Error(c, http.StatusNotFound, message)
+}
+
+// --- Backward-compatible aliases ---
+// Some handlers still use the older `*Error` naming. Keep these wrappers to avoid build breaks.
+func BadRequestError(c *gin.Context, message string) {
+	BadRequest(c, message)
+}
+
+func UnauthorizedError(c *gin.Context, message string) {
+	Unauthorized(c, message)
+}
+
+func ForbiddenError(c *gin.Context, message string) {
+	Forbidden(c, message)
+}
+
+func NotFoundError(c *gin.Context, message string) {
+	NotFound(c, message)
 }
 
 // InternalServerError 500错误

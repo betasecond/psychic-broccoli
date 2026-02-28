@@ -158,13 +158,29 @@ type Notification struct {
 
 // Discussion 讨论模型
 type Discussion struct {
-	ID        int64     `json:"id"`
-	Title     string    `json:"title"`
-	Course    string    `json:"course"`
-	Author    string    `json:"author"`
-	Replies   int       `json:"replies"`
-	LastReply string    `json:"lastReply"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Content     string    `json:"content"`
+	CourseID    int64     `json:"courseId"`
+	CourseTitle string    `json:"courseTitle,omitempty"`
+	AuthorID    int64     `json:"authorId"`
+	AuthorName  string    `json:"authorName,omitempty"`
+	Replies     int       `json:"replies"`
+	LastReplyAt *time.Time `json:"lastReplyAt,omitempty"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	RepliesList []DiscussionReply `json:"repliesList,omitempty"`
+}
+
+// DiscussionReply 讨论回复模型
+type DiscussionReply struct {
+	ID           int64     `json:"id"`
+	DiscussionID int64     `json:"discussionId"`
+	Content      string    `json:"content"`
+	AuthorID     int64     `json:"authorId"`
+	AuthorName   string    `json:"authorName,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 

@@ -4,7 +4,9 @@
 # ============================================================
 
 # --- Stage 1: Build the Go binary ---
-FROM golang:1.24-alpine AS builder
+# Pin to the exact toolchain version required by go.mod (`toolchain go1.24.9`).
+# With `GOTOOLCHAIN=local`, a patch mismatch (e.g. 1.24.0 image) can cause `go build` to fail in CI/buildx.
+FROM golang:1.24.9-alpine AS builder
 
 # Avoid auto-downloading Go toolchains during docker build (go.mod has `toolchain ...`).
 # This makes CI/buildx more reliable in restricted network environments.
@@ -22,17 +24,24 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build with CGO enabled for SQLite support
-# Use static linking for alpine compatibility
-RUN CGO_ENABLED=1 GOOS=linux go build \
+# BuildKit/buildx will provide these automatically for multi-arch builds.
+ARG TARGETOS
+ARG TARGETARCH
+
+# Build with CGO enabled for SQLite support.
+# If building with buildx, TARGETOS/TARGETARCH will be set; otherwise we fall back to Go defaults.
+RUN set -eu; \
+    export GOOS="${TARGETOS:-linux}"; \
+    if [ -n "${TARGETARCH:-}" ]; then export GOARCH="$TARGETARCH"; fi; \
+    CGO_ENABLED=1 go build \
     -ldflags="-w -s" \
     -o server main.go
 
 # --- Stage 2: Production runtime image ---
 FROM alpine:3.20
 
-# Install ca-certificates for HTTPS and timezone data
-RUN apk add --no-cache ca-certificates tzdata
+# Install ca-certificates for HTTPS, timezone data, and wget for healthcheck
+RUN apk add --no-cache ca-certificates tzdata wget
 
 WORKDIR /app
 

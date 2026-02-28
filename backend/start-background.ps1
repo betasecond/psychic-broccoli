@@ -28,7 +28,7 @@ $process = Get-Process -Name "server" -ErrorAction SilentlyContinue
 if ($process) {
     Write-Host "✅ 服务器已在后台启动！" -ForegroundColor Green
     Write-Host "   PID: $($process.Id)" -ForegroundColor Cyan
-    Write-Host "   监听地址: http://localhost:8081" -ForegroundColor Cyan
+    Write-Host "   监听地址: http://localhost:8080" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "💡 运行 test-api.ps1 测试API" -ForegroundColor Yellow
     Write-Host "💡 运行 stop-server.ps1 停止服务器" -ForegroundColor Yellow

@@ -9,6 +9,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector, selectCurrentExam, selectExamQuestions, selectExamLoading } from '../../store';
 import { fetchExam, submitExam, clearCurrentExam } from '../../store/slices/examSlice';
+import { trace } from '@opentelemetry/api';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -64,6 +65,12 @@ const TakeExamPage: React.FC = () => {
       answer: answer,
     }));
 
+    // Start Trace
+    const tracer = trace.getTracer('frontend-service');
+    const span = tracer.startSpan('user_interaction.submit_exam_click');
+    span.setAttribute('exam.id', id);
+    span.setAttribute('answer.count', answerList.length);
+
     setSubmitting(true);
     try {
       await dispatch(submitExam({
@@ -73,10 +80,13 @@ const TakeExamPage: React.FC = () => {
       
       message.success('考试提交成功！');
       navigate(`/student/exams/${id}`);
+      span.addEvent('submission_response_received');
     } catch (error: any) {
+      span.recordException(error);
       message.error(error.message || '提交失败');
     } finally {
       setSubmitting(false);
+      span.end();
     }
   };
 

@@ -4,7 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+
+	"github.com/XSAM/otelsql"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/online-education-platform/backend/utils"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
+	"go.uber.org/zap"
 )
 
 var DB *sql.DB
@@ -13,10 +18,21 @@ var DB *sql.DB
 func InitDB(dbPath string) error {
 	var err error
 
-	// 打开数据库连接
-	DB, err = sql.Open("sqlite3", dbPath)
+	// 打开数据库连接 (使用otelsql包装)
+	DB, err = otelsql.Open("sqlite3", dbPath,
+		otelsql.WithAttributes(
+			semconv.DBSystemSqlite,
+		),
+	)
 	if err != nil {
 		return fmt.Errorf("无法打开数据库: %v", err)
+	}
+
+	// 注册DBStats Metrics
+	if _, err := otelsql.RegisterDBStatsMetrics(DB, otelsql.WithAttributes(
+		semconv.DBSystemSqlite,
+	)); err != nil {
+		utils.GetLogger().Warn("注册数据库指标失败", zap.Error(err))
 	}
 
 	// 测试连接
@@ -39,7 +55,7 @@ func InitDB(dbPath string) error {
 		return fmt.Errorf("数据库自动迁移失败: %v", err)
 	}
 
-	fmt.Println("✅ 数据库初始化成功")
+	utils.GetLogger().Info("✅ 数据库初始化成功")
 	return nil
 }
 
@@ -88,12 +104,18 @@ func addColumnIfNotExists(tableName, columnName, columnType string) error {
 
 	// 如果列不存在，执行 ALTER TABLE
 	if !exists {
-		fmt.Printf("⚠️ 检测到表 %s 缺少列 %s，正在自动添加...\n", tableName, columnName)
+		utils.GetLogger().Info("⚠️ 检测到表缺少列，正在自动添加...",
+			zap.String("table", tableName),
+			zap.String("column", columnName),
+		)
 		alterSQL := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, columnType)
 		if _, err := DB.Exec(alterSQL); err != nil {
 			return fmt.Errorf("添加列失败: %v", err)
 		}
-		fmt.Printf("✅ 成功添加列: %s.%s\n", tableName, columnName)
+		utils.GetLogger().Info("✅ 成功添加列",
+			zap.String("table", tableName),
+			zap.String("column", columnName),
+		)
 	}
 
 	return nil

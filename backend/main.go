@@ -1,8 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"context"
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/config"
@@ -10,9 +9,33 @@ import (
 	"github.com/online-education-platform/backend/handlers"
 	"github.com/online-education-platform/backend/middleware"
 	"github.com/online-education-platform/backend/utils"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.uber.org/zap"
 )
 
 func main() {
+	// 初始化Zap日志
+	utils.InitLogger()
+	logger := utils.GetLogger()
+	defer logger.Sync() // 刷新缓存
+
+	// 初始化Telemetry
+	shutdown, err := utils.InitTelemetry("backend-service")
+	if err != nil {
+		logger.Fatal("Telemetry 初始化失败", zap.Error(err))
+	}
+	defer func() {
+		if err := shutdown(context.Background()); err != nil {
+			logger.Error("Telemetry 关闭失败", zap.Error(err))
+		}
+	}()
+
+	// 启动Runtime指标采集
+	if err := runtime.Start(); err != nil {
+		logger.Warn("Runtime metrics 启动失败", zap.Error(err))
+	}
+
 	// 加载配置
 	cfg := config.Load()
 
@@ -21,24 +44,26 @@ func main() {
 
 	// 初始化数据库
 	if err := database.InitDB(cfg.DBPath); err != nil {
-		log.Fatalf("数据库初始化失败: %v", err)
+		logger.Fatal("数据库初始化失败", zap.Error(err))
 	}
 	defer database.CloseDB()
 
 	// 填充测试数据（可通过 ENABLE_SEED 环境变量控制）
 	if cfg.EnableSeed {
 		if err := database.SeedData(); err != nil {
-			log.Printf("填充测试数据失败: %v", err)
+			logger.Error("填充测试数据失败", zap.Error(err))
 		}
 	} else {
-		fmt.Println("ℹ️  测试数据填充已禁用 (ENABLE_SEED=false)")
+		logger.Info("ℹ️  测试数据填充已禁用 (ENABLE_SEED=false)")
 	}
 
 	// 设置Gin模式
 	gin.SetMode(gin.ReleaseMode)
 
 	// 创建路由
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(otelgin.Middleware("backend-service")) // 添加OTel中间件
 
 	// 使用中间件
 	r.Use(middleware.CORSMiddleware())
@@ -199,6 +224,7 @@ func main() {
 		}
 
 		// 讨论路由
+		// Note: Gin routes must include a leading "/" for params, otherwise you'll register "/discussions:id".
 		discussions := v1.Group("/discussions")
 		discussions.Use(middleware.AuthMiddleware())
 		{
@@ -234,13 +260,13 @@ func main() {
 
 	// 启动服务器
 	addr := ":" + cfg.ServerPort
-	fmt.Printf("\n🚀 服务器启动成功！\n")
-	fmt.Printf("📍 监听地址: http://localhost%s\n", addr)
-	fmt.Printf("📚 API文档: http://localhost%s/api/v1\n", addr)
-	fmt.Printf("\n按 Ctrl+C 停止服务器\n\n")
+	logger.Info("🚀 服务器启动成功！",
+		zap.String("addr", "http://localhost"+addr),
+		zap.String("docs", "http://localhost"+addr+"/api/v1"),
+	)
 
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("服务器启动失败: %v", err)
+		logger.Fatal("服务器启动失败", zap.Error(err))
 	}
 }
 

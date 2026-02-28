@@ -9,6 +9,9 @@ import (
 	"github.com/online-education-platform/backend/database"
 	"github.com/online-education-platform/backend/models"
 	"github.com/online-education-platform/backend/utils"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // CreateExamRequest 创建考试请求
@@ -286,6 +289,27 @@ func SubmitExam(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	role, _ := c.Get("role")
 
+	// 1. 获取当前上下文的 Tracer
+	tracer := otel.Tracer("backend-service")
+
+	// 2. 开启一个自定义的业务 Span
+	ctx, span := tracer.Start(c.Request.Context(), "business.exam.submit")
+	defer span.End()
+
+	// 安全转换 userID
+	var uid int
+	if v, ok := userID.(int64); ok {
+		uid = int(v)
+	} else if v, ok := userID.(float64); ok {
+		uid = int(v)
+	}
+
+	span.SetAttributes(
+		attribute.String("exam.id", examID),
+		attribute.Int("user.id", uid),
+		attribute.String("submission.client_ip", c.ClientIP()),
+	)
+
 	if role != "STUDENT" {
 		utils.BadRequest(c, "只有学生可以提交答卷")
 		return
@@ -297,6 +321,8 @@ func SubmitExam(c *gin.Context) {
 		return
 	}
 
+	span.SetAttributes(attribute.Int("submission.question_count", len(req.Answers)))
+
 	// 检查考试是否存在
 	var courseID int64
 	var startTime, endTime time.Time
@@ -305,10 +331,14 @@ func SubmitExam(c *gin.Context) {
 	`, examID).Scan(&courseID, &startTime, &endTime)
 
 	if err == sql.ErrNoRows {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "考试不存在")
 		utils.NotFound(c, "考试不存在")
 		return
 	}
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "数据库错误")
 		utils.InternalServerError(c, "服务器错误")
 		return
 	}
@@ -316,13 +346,26 @@ func SubmitExam(c *gin.Context) {
 	// 检查是否在考试时间内
 	now := time.Now()
 	if now.Before(startTime) {
+		span.SetAttributes(
+			attribute.String("error.type", "business_rule_violation"),
+			attribute.String("submission.failure_reason", "too_early"),
+		)
+		span.SetStatus(codes.Error, "考试尚未开始")
 		utils.BadRequest(c, "考试尚未开始")
 		return
 	}
 	if now.After(endTime) {
+		span.SetAttributes(
+			attribute.Bool("submission.is_late", true),
+			attribute.String("error.type", "business_rule_violation"),
+			attribute.Float64("submission.time_remaining", endTime.Sub(now).Seconds()),
+		)
+		span.SetStatus(codes.Error, "Late submission rejected")
 		utils.BadRequest(c, "考试已结束")
 		return
 	}
+
+	span.SetAttributes(attribute.Float64("submission.time_remaining", endTime.Sub(now).Seconds()))
 
 	// 检查学生是否选了这门课
 	var count int
@@ -362,6 +405,9 @@ func SubmitExam(c *gin.Context) {
 	submissionID, _ := result.LastInsertId()
 
 	// 保存答案并自动判分
+	// 开启判分 Span
+	ctx, gradingSpan := tracer.Start(ctx, "business.grading.batch")
+
 	totalScore := 0.0
 	for _, answer := range req.Answers {
 		// 获取题目信息，同时验证题目属于当前考试（防止注入其他考试的题目）
@@ -373,8 +419,15 @@ func SubmitExam(c *gin.Context) {
 		)
 
 		if err != nil {
+			qSpan.RecordError(err)
+			qSpan.End()
 			continue
 		}
+
+		qSpan.SetAttributes(
+			attribute.Int64("question.id", question.ID),
+			attribute.String("grading.rule_id", question.Type),
+		)
 
 		// 计算得分
 		scoreAwarded := 0.0
@@ -386,6 +439,8 @@ func SubmitExam(c *gin.Context) {
 		}
 		// 主观题暂不判分，等待教师批改
 
+		qSpan.SetAttributes(attribute.Float64("grading.score", scoreAwarded))
+
 		totalScore += scoreAwarded
 
 		// 保存答案
@@ -393,12 +448,19 @@ func SubmitExam(c *gin.Context) {
 			INSERT INTO exam_answers (submission_id, question_id, student_answer, score_awarded)
 			VALUES (?, ?, ?, ?)
 		`, submissionID, answer.QuestionID, answer.Answer, scoreAwarded)
+
+		qSpan.End()
 	}
+
+	gradingSpan.End()
 
 	// 更新总分
 	database.DB.Exec(`
 		UPDATE exam_submissions SET total_score = ? WHERE id = ?
 	`, totalScore, submissionID)
+
+	span.SetAttributes(attribute.Float64("grading.total_score", totalScore))
+	span.AddEvent("exam_submitted_successfully")
 
 	utils.SuccessWithMessage(c, "提交成功", gin.H{
 		"submissionId": submissionID,

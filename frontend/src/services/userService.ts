@@ -78,7 +78,7 @@ class UserService {
   /**
    * 获取用户列表
    */
-  async getUsers(params: { page?: number; pageSize?: number; role?: string } = {}): Promise<UserListResponse> {
+  async getUsers(params: { page?: number; pageSize?: number; role?: string; search?: string } = {}): Promise<UserListResponse> {
     const response = await api.get('/users', { params })
     
     // 确保用户列表中的每个用户都有userId字段（兼容后端返回的id字段）
