@@ -120,17 +120,17 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
                   title={
                     <Space>
                       <span>{item.title}</span>
-                      <Tag color={item.status === 'closed' ? 'default' : 'green'}>
-                        {item.status === 'closed' ? '已关闭' : '进行中'}
+                      <Tag color={item.status === 'CLOSED' ? 'default' : 'green'}>
+                        {item.status === 'CLOSED' ? '已关闭' : '进行中'}
                       </Tag>
                     </Space>
                   }
                   description={
                     <Space wrap>
-                      <Text type="secondary">课程：{item.courseTitle || item.courseId}</Text>
-                      <Text type="secondary">作者：{item.authorName || item.authorId}</Text>
-                      <Text type="secondary">回复：{item.replies}</Text>
-                      <Text type="secondary">最后回复：{formatTime(item.lastReplyAt || item.createdAt)}</Text>
+                      <Text type="secondary">课程：{item.course?.title ?? '-'}</Text>
+                      <Text type="secondary">作者：{item.author?.username ?? '-'}</Text>
+                      <Text type="secondary">回复：{item.replyCount}</Text>
+                      <Text type="secondary">发布：{formatTime(item.createdAt)}</Text>
                     </Space>
                   }
                 />

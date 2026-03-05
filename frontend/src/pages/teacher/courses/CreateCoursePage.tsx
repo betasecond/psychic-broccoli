@@ -315,7 +315,7 @@ const CreateCoursePage: React.FC = () => {
           <Card title="提示" style={{ marginTop: 16 }}>
             <Space direction="vertical" size="small">
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                • 课程创建后，学生可以浏览并选课
+                • 课程创建后将自动发布，学生可以浏览并选课
               </Text>
               <Text type="secondary" style={{ fontSize: '12px' }}>
                 • 创建课程后可以继续添加章节和作业

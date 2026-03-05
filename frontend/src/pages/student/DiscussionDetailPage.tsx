@@ -18,6 +18,8 @@ import {
   CommentOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
+  LikeOutlined,
+  LikeFilled,
 } from '@ant-design/icons'
 import { discussionService } from '@/services'
 import type { DiscussionDetail, DiscussionReply } from '@/services/discussionService'
@@ -127,6 +129,26 @@ const DiscussionDetailPage: React.FC = () => {
     })
   }
 
+  const handleLike = async (reply: DiscussionReply) => {
+    if (!currentUser) {
+      message.warning('请先登录')
+      return
+    }
+    try {
+      const result = await discussionService.likeReply(parseInt(id!), reply.id)
+      setDiscussion(prev => prev ? {
+        ...prev,
+        replies: prev.replies.map(r =>
+          r.id === reply.id
+            ? { ...r, isLiked: result.liked, likeCount: result.likeCount }
+            : r
+        ),
+      } : null)
+    } catch {
+      message.error('操作失败，请重试')
+    }
+  }
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -214,7 +236,20 @@ const DiscussionDetailPage: React.FC = () => {
         <List
           dataSource={discussion.replies || []}
           renderItem={(reply: DiscussionReply) => (
-            <List.Item className="reply-item">
+            <List.Item
+              className="reply-item"
+              actions={[
+                <Button
+                  key="like"
+                  type="text"
+                  size="small"
+                  icon={reply.isLiked ? <LikeFilled style={{ color: '#1890ff' }} /> : <LikeOutlined />}
+                  onClick={() => handleLike(reply)}
+                >
+                  {reply.likeCount > 0 ? reply.likeCount : '点赞'}
+                </Button>,
+              ]}
+            >
               <List.Item.Meta
                 avatar={
                   <Avatar

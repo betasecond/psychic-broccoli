@@ -10,6 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// normalizeStatus 将 DB 中存储的小写 status 归一化为前端期望的大写值
+func normalizeStatus(s string) string {
+	switch s {
+	case "active":
+		return "OPEN"
+	case "closed":
+		return "CLOSED"
+	default:
+		return s
+	}
+}
+
 // CreateDiscussion 创建讨论
 func CreateDiscussion(c *gin.Context) {
 	userID, exists := c.Get("userID")
@@ -66,11 +78,11 @@ func CreateDiscussion(c *gin.Context) {
 		userID,
 	).Scan(&username)
 
-	// 插入讨论
+	// 插入讨论（schema 中 status CHECK('active','closed')）
 	result, err := database.DB.Exec(`
-		INSERT INTO discussions (course_id, user_id, title, content, course, author, status, replies, last_reply)
-		VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0, datetime('now'))
-	`, req.CourseID, userID, req.Title, req.Content, courseTitle, username)
+		INSERT INTO discussions (course_id, author_id, title, content, status, replies)
+		VALUES (?, ?, ?, ?, 'active', 0)
+	`, req.CourseID, userID, req.Title, req.Content)
 
 	if err != nil {
 		c.JSON(500, gin.H{"error": "创建讨论失败"})
@@ -94,10 +106,10 @@ func GetDiscussions(c *gin.Context) {
 	query := `
 		SELECT d.id, d.title, d.content, d.status, d.replies, d.created_at,
 			   d.course_id, c.title as course_title,
-			   d.user_id, u.username, u.avatar_url
+			   d.author_id, u.username, u.avatar_url
 		FROM discussions d
 		LEFT JOIN courses c ON d.course_id = c.id
-		LEFT JOIN users u ON d.user_id = u.id
+		LEFT JOIN users u ON d.author_id = u.id
 		WHERE 1=1
 	`
 
@@ -109,8 +121,15 @@ func GetDiscussions(c *gin.Context) {
 	}
 
 	if status != "" {
+		// 前端传 OPEN/CLOSED，DB 存 active/closed
+		dbStatus := status
+		if status == "OPEN" {
+			dbStatus = "active"
+		} else if status == "CLOSED" {
+			dbStatus = "closed"
+		}
 		query += " AND d.status = ?"
-		args = append(args, status)
+		args = append(args, dbStatus)
 	}
 
 	if keyword != "" {
@@ -150,11 +169,11 @@ func GetDiscussions(c *gin.Context) {
 		}
 
 		discussionData := map[string]interface{}{
-			"id":        d.ID,
-			"title":     d.Title,
-			"status":    d.Status,
+			"id":         d.ID,
+			"title":      d.Title,
+			"status":     normalizeStatus(d.Status),
 			"replyCount": d.Replies,
-			"createdAt": d.CreatedAt.Format(time.RFC3339),
+			"createdAt":  d.CreatedAt.Format(time.RFC3339),
 		}
 
 		if d.Content.Valid {
@@ -188,15 +207,16 @@ func GetDiscussions(c *gin.Context) {
 // GetDiscussionDetail 获取讨论详情
 func GetDiscussionDetail(c *gin.Context) {
 	discussionID := c.Param("id")
+	currentUserID, _ := c.Get("userID")
 
 	// 查询讨论基本信息
 	query := `
 		SELECT d.id, d.title, d.content, d.status, d.replies, d.created_at,
 			   d.course_id, c.title as course_title,
-			   d.user_id, u.username, u.avatar_url
+			   d.author_id, u.username, u.avatar_url
 		FROM discussions d
 		LEFT JOIN courses c ON d.course_id = c.id
-		LEFT JOIN users u ON d.user_id = u.id
+		LEFT JOIN users u ON d.author_id = u.id
 		WHERE d.id = ?
 	`
 
@@ -227,11 +247,11 @@ func GetDiscussionDetail(c *gin.Context) {
 	}
 
 	discussionData := map[string]interface{}{
-		"id":        d.ID,
-		"title":     d.Title,
-		"status":    d.Status,
+		"id":         d.ID,
+		"title":      d.Title,
+		"status":     normalizeStatus(d.Status),
 		"replyCount": d.Replies,
-		"createdAt": d.CreatedAt.Format(time.RFC3339),
+		"createdAt":  d.CreatedAt.Format(time.RFC3339),
 	}
 
 	if d.Content.Valid {
@@ -256,17 +276,21 @@ func GetDiscussionDetail(c *gin.Context) {
 		discussionData["author"] = author
 	}
 
-	// 查询回复列表
+	// 查询回复列表（含点赞数和当前用户是否已点赞）
 	repliesQuery := `
 		SELECT r.id, r.content, r.created_at,
-			   u.id as user_id, u.username, u.avatar_url
+			   u.id as user_id, u.username, u.avatar_url,
+			   COUNT(l.id) AS like_count,
+			   MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) AS is_liked
 		FROM discussion_replies r
-		JOIN users u ON r.user_id = u.id
+		JOIN users u ON r.author_id = u.id
+		LEFT JOIN reply_likes l ON l.reply_id = r.id
 		WHERE r.discussion_id = ?
+		GROUP BY r.id
 		ORDER BY r.created_at ASC
 	`
 
-	repliesRows, err := database.DB.Query(repliesQuery, discussionID)
+	repliesRows, err := database.DB.Query(repliesQuery, currentUserID, discussionID)
 	if err == nil {
 		defer repliesRows.Close()
 
@@ -279,10 +303,13 @@ func GetDiscussionDetail(c *gin.Context) {
 				UserID    int64
 				Username  string
 				AvatarURL sql.NullString
+				LikeCount int
+				IsLiked   int
 			}
 
 			err := repliesRows.Scan(&reply.ID, &reply.Content, &reply.CreatedAt,
-				&reply.UserID, &reply.Username, &reply.AvatarURL)
+				&reply.UserID, &reply.Username, &reply.AvatarURL,
+				&reply.LikeCount, &reply.IsLiked)
 			if err != nil {
 				continue
 			}
@@ -291,6 +318,8 @@ func GetDiscussionDetail(c *gin.Context) {
 				"id":        reply.ID,
 				"content":   reply.Content,
 				"createdAt": reply.CreatedAt.Format(time.RFC3339),
+				"likeCount": reply.LikeCount,
+				"isLiked":   reply.IsLiked == 1,
 				"user": map[string]interface{}{
 					"id":       reply.UserID,
 					"username": reply.Username,
@@ -350,7 +379,7 @@ func ReplyDiscussion(c *gin.Context) {
 		return
 	}
 
-	if status == "CLOSED" {
+	if status == "closed" {
 		c.JSON(400, gin.H{"error": "讨论已关闭，无法回复"})
 		return
 	}
@@ -372,7 +401,7 @@ func ReplyDiscussion(c *gin.Context) {
 
 	// 插入回复
 	result, err := database.DB.Exec(`
-		INSERT INTO discussion_replies (discussion_id, user_id, content)
+		INSERT INTO discussion_replies (discussion_id, author_id, content)
 		VALUES (?, ?, ?)
 	`, discussionID, userID, req.Content)
 
@@ -384,7 +413,7 @@ func ReplyDiscussion(c *gin.Context) {
 	// 更新讨论的回复数和最后回复时间
 	database.DB.Exec(`
 		UPDATE discussions
-		SET replies = replies + 1, last_reply = datetime('now')
+		SET replies = replies + 1, last_reply_at = datetime('now')
 		WHERE id = ?
 	`, discussionID)
 
@@ -431,7 +460,7 @@ func CloseDiscussion(c *gin.Context) {
 	var courseID int64
 	var instructorID int64
 	err := database.DB.QueryRow(`
-		SELECT d.user_id, d.course_id, c.instructor_id
+		SELECT d.author_id, d.course_id, c.instructor_id
 		FROM discussions d
 		LEFT JOIN courses c ON d.course_id = c.id
 		WHERE d.id = ?
@@ -453,7 +482,7 @@ func CloseDiscussion(c *gin.Context) {
 
 	// 关闭讨论
 	_, err = database.DB.Exec(
-		"UPDATE discussions SET status = 'CLOSED' WHERE id = ?",
+		"UPDATE discussions SET status = 'closed' WHERE id = ?",
 		discussionID,
 	)
 
@@ -480,7 +509,7 @@ func DeleteDiscussion(c *gin.Context) {
 	var authorID int64
 	var instructorID sql.NullInt64
 	err := database.DB.QueryRow(`
-		SELECT d.user_id, c.instructor_id
+		SELECT d.author_id, c.instructor_id
 		FROM discussions d
 		LEFT JOIN courses c ON d.course_id = c.id
 		WHERE d.id = ?
@@ -509,4 +538,56 @@ func DeleteDiscussion(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"message": "讨论已删除"})
+}
+
+// LikeReply 切换回复点赞状态（点赞/取消点赞）
+func LikeReply(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(401, gin.H{"error": "未授权"})
+		return
+	}
+
+	replyID, err := strconv.ParseInt(c.Param("rid"), 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "无效的回复ID"})
+		return
+	}
+
+	// 验证回复是否存在
+	var replyExists int
+	database.DB.QueryRow(
+		`SELECT COUNT(1) FROM discussion_replies WHERE id = ?`, replyID,
+	).Scan(&replyExists)
+	if replyExists == 0 {
+		c.JSON(404, gin.H{"error": "回复不存在"})
+		return
+	}
+
+	// 尝试插入点赞记录；UNIQUE 冲突则取消点赞
+	_, err = database.DB.Exec(
+		`INSERT INTO reply_likes (reply_id, user_id) VALUES (?, ?)`,
+		replyID, userID,
+	)
+
+	liked := true
+	if err != nil {
+		// UNIQUE 冲突 → 取消点赞
+		database.DB.Exec(
+			`DELETE FROM reply_likes WHERE reply_id = ? AND user_id = ?`,
+			replyID, userID,
+		)
+		liked = false
+	}
+
+	// 查询最新点赞数
+	var count int
+	database.DB.QueryRow(
+		`SELECT COUNT(1) FROM reply_likes WHERE reply_id = ?`, replyID,
+	).Scan(&count)
+
+	c.JSON(200, gin.H{
+		"liked":     liked,
+		"likeCount": count,
+	})
 }

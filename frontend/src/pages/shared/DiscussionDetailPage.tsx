@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Form, Input, List, Space, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, SendOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { discussionService, type Discussion, type DiscussionReply } from '../../services/discussionService'
 import { useAppSelector } from '../../store'
@@ -31,7 +31,7 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
   const [replies, setReplies] = useState<DiscussionReply[]>([])
   const [form] = Form.useForm<{ content: string }>()
 
-  const isClosed = discussion?.status === 'closed'
+  const isClosed = discussion?.status === 'CLOSED'
   const canReply = !!user && !isClosed
 
   const refresh = async () => {
@@ -66,12 +66,29 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
         <Text type="secondary">作者：{discussion.authorName || discussion.authorId}</Text>
         <Text type="secondary">创建：{formatTime(discussion.createdAt)}</Text>
         <Text type="secondary">最后回复：{formatTime(discussion.lastReplyAt || discussion.createdAt)}</Text>
-        <Tag color={discussion.status === 'closed' ? 'default' : 'green'}>
-          {discussion.status === 'closed' ? '已关闭' : '进行中'}
+        <Tag color={discussion.status === 'CLOSED' ? 'default' : 'green'}>
+          {discussion.status === 'CLOSED' ? '已关闭' : '进行中'}
         </Tag>
       </Space>
     )
   }, [discussion])
+
+  const handleLike = async (reply: DiscussionReply) => {
+    if (!user) {
+      message.warning('请先登录')
+      return
+    }
+    try {
+      const result = await discussionService.likeReply(discussionId, reply.id)
+      setReplies(prev => prev.map(r =>
+        r.id === reply.id
+          ? { ...r, isLiked: result.liked, likeCount: result.likeCount }
+          : r
+      ))
+    } catch {
+      message.error('操作失败，请重试')
+    }
+  }
 
   const onSubmit = async () => {
     if (!canReply) {
@@ -119,7 +136,19 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
             dataSource={replies}
             rowKey={r => String(r.id)}
             renderItem={r => (
-              <List.Item>
+              <List.Item
+                actions={[
+                  <Button
+                    key="like"
+                    type="text"
+                    size="small"
+                    icon={(r.isLiked ?? false) ? <LikeFilled style={{ color: '#1890ff' }} /> : <LikeOutlined />}
+                    onClick={() => handleLike(r)}
+                  >
+                    {(r.likeCount ?? 0) > 0 ? r.likeCount : '点赞'}
+                  </Button>,
+                ]}
+              >
                 <List.Item.Meta
                   title={
                     <Space wrap>

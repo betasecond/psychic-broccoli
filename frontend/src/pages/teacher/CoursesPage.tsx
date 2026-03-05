@@ -128,7 +128,7 @@ const TeacherCoursesPage: React.FC = () => {
         categoryId: course.categoryId,
         coverImageUrl: course.coverImageUrl,
         status: newStatus,
-      } as any)
+      })
       message.success(`课程已${action}`)
       fetchMyCourses()
     } catch (error: any) {

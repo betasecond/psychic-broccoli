@@ -211,3 +211,14 @@ CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 CREATE INDEX IF NOT EXISTS idx_discussions_status ON discussions(status);
 
+-- 回复点赞表
+CREATE TABLE IF NOT EXISTS reply_likes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    reply_id    INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(reply_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id);
+CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id);

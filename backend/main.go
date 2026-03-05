@@ -232,6 +232,7 @@ func main() {
 			discussions.GET("", handlers.GetDiscussions)               // 获取讨论列表
 			discussions.GET("/:id", handlers.GetDiscussionDetail)      // 获取讨论详情
 			discussions.POST("/:id/replies", handlers.ReplyDiscussion) // 回复讨论
+			discussions.POST("/:id/replies/:rid/like", handlers.LikeReply) // 点赞/取消点赞
 			discussions.PUT("/:id/close", handlers.CloseDiscussion)    // 关闭讨论
 			discussions.DELETE("/:id", handlers.DeleteDiscussion)      // 删除讨论
 		}

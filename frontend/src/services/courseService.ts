@@ -67,6 +67,7 @@ export interface UpdateCourseRequest {
   description?: string
   categoryId?: number
   coverImageUrl?: string
+  status?: string
 }
 
 export interface CreateChapterRequest {

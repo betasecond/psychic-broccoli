@@ -182,5 +182,7 @@ type DiscussionReply struct {
 	AuthorName   string    `json:"authorName,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
+	LikeCount    int       `json:"likeCount"`
+	IsLiked      bool      `json:"isLiked"`
 }
 

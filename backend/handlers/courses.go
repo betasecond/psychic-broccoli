@@ -216,7 +216,7 @@ func CreateCourse(c *gin.Context) {
 
 	status := req.Status
 	if status == "" {
-		status = "DRAFT"
+		status = "PUBLISHED"
 	}
 
 	result, err := database.DB.Exec(`

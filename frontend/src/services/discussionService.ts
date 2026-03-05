@@ -28,6 +28,8 @@ export interface DiscussionReply {
     username: string
     avatarUrl?: string
   }
+  likeCount: number
+  isLiked: boolean
 }
 
 export interface DiscussionDetail extends Discussion {
@@ -81,6 +83,17 @@ class DiscussionService {
   // 删除讨论
   async deleteDiscussion(id: number): Promise<void> {
     await api.delete(`/discussions/${id}`)
+  }
+
+  // 点赞 / 取消点赞回复
+  async likeReply(
+    discussionId: number,
+    replyId: number
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    const response = await api.post(
+      `/discussions/${discussionId}/replies/${replyId}/like`
+    )
+    return response
   }
 }
 
