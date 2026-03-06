@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Form, Input, List, Space, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined } from '@ant-design/icons'
+import React, { useEffect, useState } from 'react'
+import { Avatar, Button, Card, Form, Input, List, Space, Tag, Typography, message } from 'antd'
+import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
-import { discussionService, type Discussion, type DiscussionReply } from '../../services/discussionService'
+import { discussionService, type DiscussionDetail, type DiscussionReply } from '../../services/discussionService'
 import { useAppSelector } from '../../store'
 
 const { Title, Text } = Typography
@@ -27,7 +27,7 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [discussion, setDiscussion] = useState<Discussion | null>(null)
+  const [discussion, setDiscussion] = useState<DiscussionDetail | null>(null)
   const [replies, setReplies] = useState<DiscussionReply[]>([])
   const [form] = Form.useForm<{ content: string }>()
 
@@ -38,15 +38,9 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
     if (!Number.isFinite(discussionId)) return
     setLoading(true)
     try {
-      const d = await discussionService.getDiscussion(discussionId)
+      const d = await discussionService.getDiscussionDetail(discussionId)
       setDiscussion(d)
-      // 后端详情接口已返回 repliesList；为了稳妥，也允许 fallback 到单独拉 replies
-      if (Array.isArray(d.repliesList)) {
-        setReplies(d.repliesList)
-      } else {
-        const rs = await discussionService.getReplies(discussionId)
-        setReplies(Array.isArray(rs) ? rs : [])
-      }
+      setReplies(Array.isArray(d.replies) ? d.replies : [])
     } catch (e: any) {
       message.error(e?.message || '获取讨论详情失败')
     } finally {
@@ -57,21 +51,6 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
   useEffect(() => {
     refresh()
   }, [discussionId])
-
-  const headerMeta = useMemo(() => {
-    if (!discussion) return null
-    return (
-      <Space wrap>
-        <Text type="secondary">课程：{discussion.courseTitle || discussion.courseId}</Text>
-        <Text type="secondary">作者：{discussion.authorName || discussion.authorId}</Text>
-        <Text type="secondary">创建：{formatTime(discussion.createdAt)}</Text>
-        <Text type="secondary">最后回复：{formatTime(discussion.lastReplyAt || discussion.createdAt)}</Text>
-        <Tag color={discussion.status === 'CLOSED' ? 'default' : 'green'}>
-          {discussion.status === 'CLOSED' ? '已关闭' : '进行中'}
-        </Tag>
-      </Space>
-    )
-  }, [discussion])
 
   const handleLike = async (reply: DiscussionReply) => {
     if (!user) {
@@ -98,7 +77,7 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
     const values = await form.validateFields()
     setSubmitting(true)
     try {
-      await discussionService.createReply(discussionId, { content: values.content })
+      await discussionService.replyDiscussion(discussionId, values.content)
       message.success('回复已发送')
       form.resetFields()
       await refresh()
@@ -125,7 +104,14 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
             </Space>
           }
         >
-          {headerMeta}
+          <Space wrap>
+            <Text type="secondary">课程：{discussion?.course?.title ?? '-'}</Text>
+            <Text type="secondary">作者：{discussion?.author?.username ?? '-'}</Text>
+            <Text type="secondary">创建：{formatTime(discussion?.createdAt)}</Text>
+            <Tag color={discussion?.status === 'CLOSED' ? 'default' : 'green'}>
+              {discussion?.status === 'CLOSED' ? '已关闭' : '进行中'}
+            </Tag>
+          </Space>
           <div style={{ marginTop: 12 }}>
             <Text>{discussion?.content}</Text>
           </div>
@@ -150,17 +136,24 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
                 ]}
               >
                 <List.Item.Meta
+                  avatar={
+                    <Avatar
+                      src={r.user?.avatarUrl}
+                      icon={!r.user?.avatarUrl && <UserOutlined />}
+                    />
+                  }
                   title={
                     <Space wrap>
-                      <Text strong>{r.authorName || `用户#${r.authorId}`}</Text>
+                      <Text strong>{r.user?.username ?? `用户#${r.user?.id}`}</Text>
                       <Text type="secondary">{formatTime(r.createdAt)}</Text>
-                      {user?.userId === r.authorId && <Tag color="blue">我</Tag>}
+                      {user?.userId === r.user?.id && <Tag color="blue">我</Tag>}
                     </Space>
                   }
                   description={<Text>{r.content}</Text>}
                 />
               </List.Item>
             )}
+            locale={{ emptyText: '暂无回复' }}
           />
         </Card>
 
@@ -183,7 +176,3 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
 }
 
 export default DiscussionDetailPage
-
-
-
-

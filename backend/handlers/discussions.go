@@ -3,11 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/online-education-platform/backend/database"
-
 	"github.com/gin-gonic/gin"
+	"github.com/online-education-platform/backend/database"
+	"github.com/online-education-platform/backend/utils"
+	"go.uber.org/zap"
 )
 
 // normalizeStatus 将 DB 中存储的小写 status 归一化为前端期望的大写值
@@ -26,7 +28,7 @@ func normalizeStatus(s string) string {
 func CreateDiscussion(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(401, gin.H{"error": "未授权"})
+		utils.Unauthorized(c, "未授权")
 		return
 	}
 
@@ -37,7 +39,7 @@ func CreateDiscussion(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "参数错误"})
+		utils.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -49,10 +51,11 @@ func CreateDiscussion(c *gin.Context) {
 	).Scan(&courseTitle)
 
 	if err == sql.ErrNoRows {
-		c.JSON(404, gin.H{"error": "课程不存在"})
+		utils.NotFound(c, "课程不存在")
 		return
 	} else if err != nil {
-		c.JSON(500, gin.H{"error": "查询课程失败"})
+		utils.GetLogger().Error("查询课程失败", zap.Error(err))
+		utils.InternalServerError(c, "查询课程失败")
 		return
 	}
 
@@ -66,7 +69,7 @@ func CreateDiscussion(c *gin.Context) {
 		).Scan(&enrolled)
 
 		if enrolled == 0 {
-			c.JSON(403, gin.H{"error": "您未选修此课程，无法发起讨论"})
+			utils.Forbidden(c, "您未选修此课程，无法发起讨论")
 			return
 		}
 	}
@@ -85,13 +88,14 @@ func CreateDiscussion(c *gin.Context) {
 	`, req.CourseID, userID, req.Title, req.Content)
 
 	if err != nil {
-		c.JSON(500, gin.H{"error": "创建讨论失败"})
+		utils.GetLogger().Error("创建讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "创建讨论失败")
 		return
 	}
 
 	discussionID, _ := result.LastInsertId()
 
-	c.JSON(200, gin.H{
+	utils.Success(c, gin.H{
 		"id":      discussionID,
 		"message": "讨论创建成功",
 	})
@@ -141,7 +145,8 @@ func GetDiscussions(c *gin.Context) {
 
 	rows, err := database.DB.Query(query, args...)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "查询讨论列表失败"})
+		utils.GetLogger().Error("查询讨论列表失败", zap.Error(err))
+		utils.InternalServerError(c, "查询讨论列表失败")
 		return
 	}
 	defer rows.Close()
@@ -201,7 +206,7 @@ func GetDiscussions(c *gin.Context) {
 		discussions = append(discussions, discussionData)
 	}
 
-	c.JSON(200, discussions)
+	utils.Success(c, discussions)
 }
 
 // GetDiscussionDetail 获取讨论详情
@@ -239,10 +244,11 @@ func GetDiscussionDetail(c *gin.Context) {
 		&d.CourseID, &d.CourseTitle, &d.UserID, &d.Username, &d.AvatarURL)
 
 	if err == sql.ErrNoRows {
-		c.JSON(404, gin.H{"error": "讨论不存在"})
+		utils.NotFound(c, "讨论不存在")
 		return
 	} else if err != nil {
-		c.JSON(500, gin.H{"error": "查询讨论失败"})
+		utils.GetLogger().Error("查询讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "查询讨论失败")
 		return
 	}
 
@@ -291,7 +297,10 @@ func GetDiscussionDetail(c *gin.Context) {
 	`
 
 	repliesRows, err := database.DB.Query(repliesQuery, currentUserID, discussionID)
-	if err == nil {
+	if err != nil {
+		utils.GetLogger().Warn("查询回复列表失败，返回空列表", zap.Error(err))
+		discussionData["replies"] = []map[string]interface{}{}
+	} else {
 		defer repliesRows.Close()
 
 		replies := []map[string]interface{}{}
@@ -336,7 +345,7 @@ func GetDiscussionDetail(c *gin.Context) {
 		discussionData["replies"] = replies
 	}
 
-	c.JSON(200, discussionData)
+	utils.Success(c, discussionData)
 }
 
 // ReplyDiscussion 回复讨论
@@ -344,13 +353,13 @@ func ReplyDiscussion(c *gin.Context) {
 	discussionIDStr := c.Param("id")
 	discussionID, err := strconv.ParseInt(discussionIDStr, 10, 64)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "无效的讨论ID"})
+		utils.BadRequest(c, "无效的讨论ID")
 		return
 	}
 
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(401, gin.H{"error": "未授权"})
+		utils.Unauthorized(c, "未授权")
 		return
 	}
 
@@ -359,7 +368,7 @@ func ReplyDiscussion(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "参数错误"})
+		utils.BadRequest(c, "参数错误")
 		return
 	}
 
@@ -372,15 +381,16 @@ func ReplyDiscussion(c *gin.Context) {
 	).Scan(&status, &courseID)
 
 	if err == sql.ErrNoRows {
-		c.JSON(404, gin.H{"error": "讨论不存在"})
+		utils.NotFound(c, "讨论不存在")
 		return
 	} else if err != nil {
-		c.JSON(500, gin.H{"error": "查询讨论失败"})
+		utils.GetLogger().Error("查询讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "查询讨论失败")
 		return
 	}
 
 	if status == "closed" {
-		c.JSON(400, gin.H{"error": "讨论已关闭，无法回复"})
+		utils.BadRequest(c, "讨论已关闭，无法回复")
 		return
 	}
 
@@ -394,7 +404,7 @@ func ReplyDiscussion(c *gin.Context) {
 		).Scan(&enrolled)
 
 		if enrolled == 0 {
-			c.JSON(403, gin.H{"error": "您未选修此课程，无法回复讨论"})
+			utils.Forbidden(c, "您未选修此课程，无法回复讨论")
 			return
 		}
 	}
@@ -406,7 +416,8 @@ func ReplyDiscussion(c *gin.Context) {
 	`, discussionID, userID, req.Content)
 
 	if err != nil {
-		c.JSON(500, gin.H{"error": "发表回复失败"})
+		utils.GetLogger().Error("发表回复失败", zap.Error(err))
+		utils.InternalServerError(c, "发表回复失败")
 		return
 	}
 
@@ -431,6 +442,8 @@ func ReplyDiscussion(c *gin.Context) {
 		"id":        replyID,
 		"content":   req.Content,
 		"createdAt": time.Now().Format(time.RFC3339),
+		"likeCount": 0,
+		"isLiked":   false,
 		"user": map[string]interface{}{
 			"id":       userID,
 			"username": username,
@@ -441,7 +454,7 @@ func ReplyDiscussion(c *gin.Context) {
 		replyData["user"].(map[string]interface{})["avatarUrl"] = avatarURL.String
 	}
 
-	c.JSON(200, replyData)
+	utils.Success(c, replyData)
 }
 
 // CloseDiscussion 关闭讨论（只有讨论发起人、讲师或管理员可以关闭）
@@ -449,7 +462,7 @@ func CloseDiscussion(c *gin.Context) {
 	discussionID := c.Param("id")
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(401, gin.H{"error": "未授权"})
+		utils.Unauthorized(c, "未授权")
 		return
 	}
 
@@ -467,16 +480,17 @@ func CloseDiscussion(c *gin.Context) {
 	`, discussionID).Scan(&authorID, &courseID, &instructorID)
 
 	if err == sql.ErrNoRows {
-		c.JSON(404, gin.H{"error": "讨论不存在"})
+		utils.NotFound(c, "讨论不存在")
 		return
 	} else if err != nil {
-		c.JSON(500, gin.H{"error": "查询讨论失败"})
+		utils.GetLogger().Error("查询讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "查询讨论失败")
 		return
 	}
 
 	// 验证权限
 	if authorID != userID.(int64) && instructorID != userID.(int64) && role != "ADMIN" {
-		c.JSON(403, gin.H{"error": "无权关闭此讨论"})
+		utils.Forbidden(c, "无权关闭此讨论")
 		return
 	}
 
@@ -487,11 +501,12 @@ func CloseDiscussion(c *gin.Context) {
 	)
 
 	if err != nil {
-		c.JSON(500, gin.H{"error": "关闭讨论失败"})
+		utils.GetLogger().Error("关闭讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "关闭讨论失败")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "讨论已关闭"})
+	utils.SuccessWithMessage(c, "讨论已关闭", nil)
 }
 
 // DeleteDiscussion 删除讨论（讨论发起人、课程教师或管理员可以删除）
@@ -499,7 +514,7 @@ func DeleteDiscussion(c *gin.Context) {
 	discussionID := c.Param("id")
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(401, gin.H{"error": "未授权"})
+		utils.Unauthorized(c, "未授权")
 		return
 	}
 
@@ -516,41 +531,43 @@ func DeleteDiscussion(c *gin.Context) {
 	`, discussionID).Scan(&authorID, &instructorID)
 
 	if err == sql.ErrNoRows {
-		c.JSON(404, gin.H{"error": "讨论不存在"})
+		utils.NotFound(c, "讨论不存在")
 		return
 	} else if err != nil {
-		c.JSON(500, gin.H{"error": "查询讨论失败"})
+		utils.GetLogger().Error("查询讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "查询讨论失败")
 		return
 	}
 
 	// 验证权限：发起人、课程教师或管理员可删除
 	isCourseInstructor := instructorID.Valid && instructorID.Int64 == userID.(int64)
 	if authorID != userID.(int64) && !isCourseInstructor && role != "ADMIN" {
-		c.JSON(403, gin.H{"error": "无权删除此讨论"})
+		utils.Forbidden(c, "无权删除此讨论")
 		return
 	}
 
 	// 删除讨论（级联删除回复）
 	_, err = database.DB.Exec("DELETE FROM discussions WHERE id = ?", discussionID)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "删除讨论失败"})
+		utils.GetLogger().Error("删除讨论失败", zap.Error(err))
+		utils.InternalServerError(c, "删除讨论失败")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "讨论已删除"})
+	utils.SuccessWithMessage(c, "讨论已删除", nil)
 }
 
 // LikeReply 切换回复点赞状态（点赞/取消点赞）
 func LikeReply(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		c.JSON(401, gin.H{"error": "未授权"})
+		utils.Unauthorized(c, "未授权")
 		return
 	}
 
 	replyID, err := strconv.ParseInt(c.Param("rid"), 10, 64)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "无效的回复ID"})
+		utils.BadRequest(c, "无效的回复ID")
 		return
 	}
 
@@ -560,7 +577,7 @@ func LikeReply(c *gin.Context) {
 		`SELECT COUNT(1) FROM discussion_replies WHERE id = ?`, replyID,
 	).Scan(&replyExists)
 	if replyExists == 0 {
-		c.JSON(404, gin.H{"error": "回复不存在"})
+		utils.NotFound(c, "回复不存在")
 		return
 	}
 
@@ -572,12 +589,19 @@ func LikeReply(c *gin.Context) {
 
 	liked := true
 	if err != nil {
-		// UNIQUE 冲突 → 取消点赞
-		database.DB.Exec(
-			`DELETE FROM reply_likes WHERE reply_id = ? AND user_id = ?`,
-			replyID, userID,
-		)
-		liked = false
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			// 已点赞 → 取消点赞
+			database.DB.Exec(
+				`DELETE FROM reply_likes WHERE reply_id = ? AND user_id = ?`,
+				replyID, userID,
+			)
+			liked = false
+		} else {
+			// 其他 DB 错误
+			utils.GetLogger().Error("点赞操作失败", zap.Error(err))
+			utils.InternalServerError(c, "操作失败，请重试")
+			return
+		}
 	}
 
 	// 查询最新点赞数
@@ -586,7 +610,7 @@ func LikeReply(c *gin.Context) {
 		`SELECT COUNT(1) FROM reply_likes WHERE reply_id = ?`, replyID,
 	).Scan(&count)
 
-	c.JSON(200, gin.H{
+	utils.Success(c, gin.H{
 		"liked":     liked,
 		"likeCount": count,
 	})
