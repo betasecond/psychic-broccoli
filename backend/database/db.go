@@ -61,7 +61,7 @@ func InitDB(dbPath string) error {
 
 // autoMigrate 集中管理所有的数据库变更
 func autoMigrate() error {
-	
+
 	// 1. assignments 表
 	if err := addColumnIfNotExists("assignments", "attachments", "TEXT"); err != nil {
 		return err
@@ -72,6 +72,12 @@ func autoMigrate() error {
 	if err := addColumnIfNotExists("users", "phone", "TEXT"); err != nil { return err }
 	if err := addColumnIfNotExists("users", "gender", "TEXT"); err != nil { return err }
 	if err := addColumnIfNotExists("users", "bio", "TEXT"); err != nil { return err }
+
+	// 3. discussions 表 - 旧版本用 author/course TEXT，新版本需要 author_id/course_id/content
+	if err := addColumnIfNotExists("discussions", "author_id", "INTEGER"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "course_id", "INTEGER"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "content", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "last_reply_at", "DATETIME"); err != nil { return err }
 
 	return nil
 }
