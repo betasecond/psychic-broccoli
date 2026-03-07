@@ -79,6 +79,29 @@ func autoMigrate() error {
 	if err := addColumnIfNotExists("discussions", "content", "TEXT"); err != nil { return err }
 	if err := addColumnIfNotExists("discussions", "last_reply_at", "DATETIME"); err != nil { return err }
 
+	// 4. discussion_replies 表 - 旧版本用 user_id，新版本需要 author_id
+	if err := addColumnIfNotExists("discussion_replies", "author_id", "INTEGER"); err != nil {
+		return err
+	}
+	// 将旧数据从 user_id 迁移到 author_id（若 user_id 列存在且 author_id 为空）
+	// 若 user_id 不存在（新库），此 SQL 会静默失败，无副作用
+	DB.Exec(`UPDATE discussion_replies SET author_id = user_id WHERE author_id IS NULL`)
+
+	// 5. reply_likes 表 - 点赞功能所需，确保旧镜像/旧容器中也能建表
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS reply_likes (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			reply_id   INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
+			user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(reply_id, user_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 reply_likes 表失败: %v", err)
+	}
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id)`)
+
 	return nil
 }
 

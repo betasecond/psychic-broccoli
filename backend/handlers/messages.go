@@ -32,7 +32,7 @@ func GetMessages(c *gin.Context) {
 	defer rows.Close()
 
 	// 解析结果
-	var messages []models.Message
+	messages := []models.Message{}
 	for rows.Next() {
 		var msg models.Message
 		if err := rows.Scan(
