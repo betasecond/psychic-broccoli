@@ -82,12 +82,6 @@ const RoleBasedNavigation: React.FC = () => {
             icon: <MessageOutlined />,
             label: '消息通知',
             onClick: () => handleMenuClick('/student/messages'),
-          },
-          {
-            key: '/student/discussions',
-            icon: <CommentOutlined />,
-            label: '课堂讨论',
-            onClick: () => handleMenuClick('/student/discussions'),
           }
         )
         break
@@ -190,12 +184,6 @@ const RoleBasedNavigation: React.FC = () => {
             icon: <BarChartOutlined />,
             label: '教学分析',
             onClick: () => handleMenuClick('/teacher/analytics'),
-          },
-          {
-            key: '/teacher/discussions',
-            icon: <CommentOutlined />,
-            label: '课堂讨论',
-            onClick: () => handleMenuClick('/teacher/discussions'),
           }
         )
         break
