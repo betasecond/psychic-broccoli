@@ -79,6 +79,7 @@ func autoMigrate() error {
 	if err := addColumnIfNotExists("discussions", "course_id", "INTEGER"); err != nil { return err }
 	if err := addColumnIfNotExists("discussions", "content", "TEXT"); err != nil { return err }
 	if err := addColumnIfNotExists("discussions", "last_reply_at", "DATETIME"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"); err != nil { return err }
 	// 再重建表，移除旧的 author/course TEXT NOT NULL 列（否则 INSERT 会因 NOT NULL 约束失败）
 	if err := rebuildDiscussionsTableIfNeeded(); err != nil {
 		return err
