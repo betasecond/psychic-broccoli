@@ -168,6 +168,10 @@ type Discussion struct {
 	Replies     int       `json:"replies"`
 	LastReplyAt *time.Time `json:"lastReplyAt,omitempty"`
 	Status      string    `json:"status"`
+	// AI Enhanced Fields
+	AIDraft     string    `json:"aiDraft,omitempty"`
+	Confidence  float64   `json:"confidenceScore,omitempty"`
+	LinkedKB    string    `json:"linkedKnowledge,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 	RepliesList []DiscussionReply `json:"repliesList,omitempty"`

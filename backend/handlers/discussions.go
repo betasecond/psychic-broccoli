@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/database"
+	"github.com/online-education-platform/backend/middleware"
 	"github.com/online-education-platform/backend/utils"
 	"go.uber.org/zap"
 )
@@ -94,6 +95,9 @@ func CreateDiscussion(c *gin.Context) {
 	}
 
 	discussionID, _ := result.LastInsertId()
+
+	// Async AI Analysis [WeiYan Strike]
+	middleware.AnalyzeDiscussionAsync(req.Title, req.Content, discussionID)
 
 	utils.Success(c, gin.H{
 		"id":      discussionID,

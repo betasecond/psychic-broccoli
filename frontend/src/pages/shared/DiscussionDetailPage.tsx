@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Avatar, Button, Card, Form, Input, List, Space, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined, UserOutlined } from '@ant-design/icons'
+import { Alert, Avatar, Button, Card, Form, Input, List, Space, Tag, Typography, message, Tooltip } from 'antd'
+import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { discussionService, type DiscussionDetail, type DiscussionReply } from '../../services/discussionService'
 import { useAppSelector } from '../../store'
@@ -115,6 +115,53 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
           <div style={{ marginTop: 12 }}>
             <Text>{discussion?.content}</Text>
           </div>
+
+          {/* AI Enhanced Section [WeiYan Strike] */}
+          {(discussion as any)?.aiDraft && (
+            <div style={{ marginTop: 16 }}>
+              <Tooltip title={`AI Confidence: ${(discussion as any).confidenceScore * 100}%`}>
+                <Alert
+                  message={
+                    <span>
+                      <RobotOutlined style={{ marginRight: 8 }} />
+                      AI 智能摘要
+                    </span>
+                  }
+                  description={
+                    <div>
+                      <Text italic>{(discussion as any).aiDraft}</Text>
+                      {(discussion as any).linkedKnowledge && (
+                        <div style={{ marginTop: 8 }}>
+                          <Button 
+                            type="link" 
+                            size="small" 
+                            href={(discussion as any).linkedKnowledge} 
+                            target="_blank"
+                          >
+                            关联知识点
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  type="info"
+                  showIcon={false}
+                />
+              </Tooltip>
+            </div>
+          )}
+
+          {/* AI Fallback/Degradation [503 Check Mock] */}
+          {discussion && !(discussion as any).aiDraft && (discussion as any).status === 'OPEN' && (
+            <div style={{ marginTop: 16 }}>
+               <Alert
+                message="AI 助手"
+                description="系统繁忙，摘要暂不可用 (503 Service Unavailable)"
+                type="warning"
+                showIcon
+              />
+            </div>
+          )}
         </Card>
 
         <Card title={`回复（${replies.length}）`} loading={loading}>

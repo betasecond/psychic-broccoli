@@ -236,6 +236,7 @@ func main() {
 		// Note: Gin routes must include a leading "/" for params, otherwise you'll register "/discussions:id".
 		discussions := v1.Group("/discussions")
 		discussions.Use(middleware.AuthMiddleware())
+		discussions.Use(middleware.AIInterceptor())
 		{
 			discussions.POST("", handlers.CreateDiscussion)            // 创建讨论
 			discussions.GET("", handlers.GetDiscussions)               // 获取讨论列表
