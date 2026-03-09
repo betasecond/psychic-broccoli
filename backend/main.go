@@ -57,6 +57,9 @@ func main() {
 		logger.Info("ℹ️  测试数据填充已禁用 (ENABLE_SEED=false)")
 	}
 
+	// 初始化文件存储后端（PLAN-04）
+	utils.InitStorage()
+
 	// 设置Gin模式
 	gin.SetMode(gin.ReleaseMode)
 
@@ -186,6 +189,12 @@ func main() {
 			exams.GET("/:id/results", handlers.GetExamResults)
 			exams.GET("/submissions/:id", handlers.GetExamSubmissionDetail)
 			exams.POST("/:id/parse-questions", handlers.ParseQuestionsWithAI)
+			// PLAN-01: SSE 流式题目解析
+			exams.POST("/:id/parse-questions/stream", handlers.ParseQuestionsStream)
+			// PLAN-02: 确认并批量导入解析题目
+			exams.POST("/:id/questions/confirm", handlers.ConfirmParsedQuestions)
+			// PLAN-03: 题目分析
+			exams.GET("/:id/question-analytics", handlers.GetExamQuestionAnalytics)
 		}
 
 		// 消息路由
@@ -250,6 +259,15 @@ func main() {
 		v1.GET("/courses/:id/materials", middleware.AuthMiddleware(), handlers.GetCourseMaterials)
 		v1.POST("/courses/:id/materials", middleware.AuthMiddleware(), handlers.UploadCourseMaterial)
 		v1.DELETE("/courses/:id/materials/:mid", middleware.AuthMiddleware(), handlers.DeleteCourseMaterial)
+		// PLAN-03: 课程学习热力图
+		v1.GET("/courses/:id/learning-heatmap", middleware.AuthMiddleware(), handlers.GetCourseLearningHeatmap)
+
+		// PLAN-05: AI 修改记录
+		ai := v1.Group("/ai")
+		ai.Use(middleware.AuthMiddleware())
+		{
+			ai.GET("/corrections", handlers.GetAICorrections)
+		}
 	}
 
 	// 健康检查

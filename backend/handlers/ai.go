@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"regexp"
 	"strconv"
@@ -8,16 +10,56 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
+	"github.com/online-education-platform/backend/database"
 	"github.com/online-education-platform/backend/utils"
+	"go.uber.org/zap"
 )
 
 // ParsedQuestion 解析出的题目结构
 type ParsedQuestion struct {
-	Type    string   `json:"type"`
-	Stem    string   `json:"stem"`
-	Options []string `json:"options,omitempty"`
-	Answer  string   `json:"answer"`
-	Score   float64  `json:"score"`
+	Type       string   `json:"type"`
+	Stem       string   `json:"stem"`
+	Options    []string `json:"options,omitempty"`
+	Answer     string   `json:"answer"`
+	Score      float64  `json:"score"`
+	Confidence float64  `json:"confidence"` // 0.0–1.0，置信度评分
+	Issues     []string `json:"issues"`     // 具体问题列表
+}
+
+// calcConfidence 计算一道题的置信度评分（满分100，归一化到0.0-1.0）
+func calcConfidence(q *ParsedQuestion) {
+	score := 100
+	issues := []string{}
+
+	if strings.TrimSpace(q.Stem) == "" {
+		score -= 40
+		issues = append(issues, "题干为空")
+	}
+
+	if (q.Type == "SINGLE_CHOICE" || q.Type == "MULTIPLE_CHOICE") && len(q.Options) < 2 {
+		score -= 30
+		issues = append(issues, "选择题选项少于2个")
+	}
+
+	if strings.TrimSpace(q.Answer) == "" {
+		score -= 20
+		issues = append(issues, "答案为空")
+	}
+
+	// 选项字母与答案字母匹配检查
+	if q.Type == "SINGLE_CHOICE" && len(q.Options) > 0 && len(q.Answer) == 1 {
+		ans := strings.ToUpper(q.Answer)
+		if ans < "A" || rune(ans[0]) > rune('A')+rune(len(q.Options)-1) {
+			score -= 10
+			issues = append(issues, "答案字母超出选项范围")
+		}
+	}
+
+	if score < 0 {
+		score = 0
+	}
+	q.Confidence = float64(score) / 100.0
+	q.Issues = issues
 }
 
 // ParseQuestionsWithAI 本地规则解析题目文件（无需外部API）
@@ -70,6 +112,227 @@ func ParseQuestionsWithAI(c *gin.Context) {
 		"questions": questions,
 		"count":     len(questions),
 	})
+}
+
+// ParseQuestionsStream SSE 流式解析题目文件
+func ParseQuestionsStream(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "INSTRUCTOR" && role != "ADMIN" {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		utils.BadRequest(c, "请上传文件")
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 2*1024*1024 {
+		utils.BadRequest(c, "文件大小不能超过2MB")
+		return
+	}
+
+	filename := strings.ToLower(header.Filename)
+	if !strings.HasSuffix(filename, ".txt") &&
+		!strings.HasSuffix(filename, ".md") &&
+		!strings.HasSuffix(filename, ".csv") {
+		utils.BadRequest(c, "仅支持 .txt / .md / .csv 格式的文件")
+		return
+	}
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		utils.InternalServerError(c, "读取文件失败")
+		return
+	}
+
+	text := strings.TrimSpace(string(content))
+	if text == "" {
+		utils.BadRequest(c, "文件内容为空")
+		return
+	}
+
+	questions := parseQuestions(text)
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // 禁用 Nginx 缓冲
+
+	ctx := c.Request.Context()
+	c.Stream(func(w io.Writer) bool {
+		for i, q := range questions {
+			// 检查客户端是否已断连
+			select {
+			case <-ctx.Done():
+				return false
+			default:
+			}
+
+			data, _ := json.Marshal(gin.H{
+				"index":    i + 1,
+				"question": q,
+				"done":     false,
+			})
+			fmt.Fprintf(w, "data: %s\n\n", data)
+		}
+
+		// 发送结束信号
+		endData, _ := json.Marshal(gin.H{
+			"done":  true,
+			"total": len(questions),
+		})
+		fmt.Fprintf(w, "data: %s\n\n", endData)
+		return false
+	})
+}
+
+// ConfirmParseRequest 确认导入解析结果的请求体
+type ConfirmParseRequest struct {
+	ExamID             int64            `json:"examId" binding:"required"`
+	OriginalQuestions  []ParsedQuestion `json:"originalQuestions" binding:"required"`
+	ConfirmedQuestions []ParsedQuestion `json:"confirmedQuestions" binding:"required"`
+}
+
+// ConfirmParsedQuestions 确认并批量导入解析题目，同时记录 AI 修改记录（PLAN-05）
+func ConfirmParsedQuestions(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		utils.Unauthorized(c, "未授权")
+		return
+	}
+	role, _ := c.Get("role")
+	if role != "INSTRUCTOR" && role != "ADMIN" {
+		utils.Forbidden(c, "权限不足")
+		return
+	}
+
+	var req ConfirmParseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	// 验证考试是否存在
+	var examExists int
+	database.DB.QueryRow("SELECT COUNT(1) FROM exams WHERE id = ?", req.ExamID).Scan(&examExists)
+	if examExists == 0 {
+		utils.NotFound(c, "考试不存在")
+		return
+	}
+
+	// 获取当前题目最大 order_index
+	var maxOrder int
+	database.DB.QueryRow("SELECT COALESCE(MAX(order_index), 0) FROM exam_questions WHERE exam_id = ?", req.ExamID).Scan(&maxOrder)
+
+	// 批量写入题目
+	insertedCount := 0
+	for i, q := range req.ConfirmedQuestions {
+		optionsJSON := "[]"
+		if len(q.Options) > 0 {
+			if b, err := json.Marshal(q.Options); err == nil {
+				optionsJSON = string(b)
+			}
+		}
+		answerJSON := fmt.Sprintf("%q", q.Answer)
+
+		_, err := database.DB.Exec(`
+			INSERT INTO exam_questions (exam_id, type, stem, options, answer, score, order_index)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, req.ExamID, q.Type, q.Stem, optionsJSON, answerJSON, q.Score, maxOrder+i+1)
+		if err != nil {
+			utils.GetLogger().Warn("批量导入题目失败", zap.Int("index", i), zap.Error(err))
+			continue
+		}
+		insertedCount++
+	}
+
+	// 记录 AI 修改（PLAN-05）：对比原始与确认版本
+	origJSON, _ := json.Marshal(req.OriginalQuestions)
+	confirmedJSON, _ := json.Marshal(req.ConfirmedQuestions)
+	diffSummary := buildDiffSummary(req.OriginalQuestions, req.ConfirmedQuestions)
+
+	_, err := database.DB.Exec(`
+		INSERT INTO ai_corrections (exam_id, user_id, original_json, corrected_json, diff_summary)
+		VALUES (?, ?, ?, ?, ?)
+	`, req.ExamID, userID, string(origJSON), string(confirmedJSON), diffSummary)
+	if err != nil {
+		utils.GetLogger().Warn("记录 AI 修改失败", zap.Error(err))
+		// 不阻断主流程
+	}
+
+	utils.Success(c, gin.H{
+		"inserted": insertedCount,
+		"total":    len(req.ConfirmedQuestions),
+	})
+}
+
+// buildDiffSummary 生成原始与确认版本的差异摘要
+func buildDiffSummary(orig, confirmed []ParsedQuestion) string {
+	changes := 0
+	for i := range confirmed {
+		if i >= len(orig) {
+			changes++
+			continue
+		}
+		if orig[i].Stem != confirmed[i].Stem ||
+			orig[i].Answer != confirmed[i].Answer ||
+			orig[i].Type != confirmed[i].Type {
+			changes++
+		}
+	}
+	return fmt.Sprintf("共 %d 道题，其中 %d 道被修改", len(confirmed), changes)
+}
+
+// GetAICorrections 获取当前用户最近 N 条 AI 修改记录（PLAN-05）
+func GetAICorrections(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		utils.Unauthorized(c, "未授权")
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "5")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 || limit > 50 {
+		limit = 5
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT id, exam_id, original_json, corrected_json, diff_summary, created_at
+		FROM ai_corrections
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, userID, limit)
+	if err != nil {
+		utils.GetLogger().Error("查询 AI 修改记录失败", zap.Error(err))
+		utils.InternalServerError(c, "查询失败")
+		return
+	}
+	defer rows.Close()
+
+	type Correction struct {
+		ID            int64  `json:"id"`
+		ExamID        int64  `json:"examId"`
+		OriginalJSON  string `json:"originalJson"`
+		CorrectedJSON string `json:"correctedJson"`
+		DiffSummary   string `json:"diffSummary"`
+		CreatedAt     string `json:"createdAt"`
+	}
+
+	corrections := []Correction{}
+	for rows.Next() {
+		var c Correction
+		if err := rows.Scan(&c.ID, &c.ExamID, &c.OriginalJSON, &c.CorrectedJSON, &c.DiffSummary, &c.CreatedAt); err != nil {
+			continue
+		}
+		corrections = append(corrections, c)
+	}
+
+	utils.Success(c, corrections)
 }
 
 // ----- 本地规则解析核心逻辑 -----
@@ -191,6 +454,8 @@ func parseQuestions(text string) []ParsedQuestion {
 		if len(buf.options) > 0 {
 			q.Options = buf.options
 		}
+		// 计算置信度（PLAN-02）
+		calcConfidence(&q)
 		questions = append(questions, q)
 		buf = qBuf{}
 	}

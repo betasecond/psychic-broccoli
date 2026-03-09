@@ -463,6 +463,11 @@ func SubmitExam(c *gin.Context) {
 	span.SetAttributes(attribute.Float64("grading.total_score", totalScore))
 	span.AddEvent("exam_submitted_successfully")
 
+	// 异步检查难题并向教师推送预警消息（PLAN-03）
+	if examIDInt, err := strconv.ParseInt(examID, 10, 64); err == nil {
+		go checkExamAndWarnTeacher(examIDInt)
+	}
+
 	utils.SuccessWithMessage(c, "提交成功", gin.H{
 		"submissionId": submissionID,
 		"totalScore":   totalScore,

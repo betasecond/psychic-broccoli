@@ -110,6 +110,28 @@ func autoMigrate() error {
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id)`)
 
+	// 6. exam_answers 表 - 新增答题耗时字段（PLAN-03）
+	if err := addColumnIfNotExists("exam_answers", "time_spent", "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
+	// 7. ai_corrections 表 - AI 解析修改记录（PLAN-05）
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS ai_corrections (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			exam_id        INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+			user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			original_json  TEXT NOT NULL,
+			corrected_json TEXT NOT NULL,
+			diff_summary   TEXT NOT NULL DEFAULT '',
+			created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 ai_corrections 表失败: %v", err)
+	}
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id ON ai_corrections(user_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id ON ai_corrections(exam_id)`)
+
 	return nil
 }
 

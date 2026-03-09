@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS exam_answers (
     submission_id INTEGER NOT NULL REFERENCES exam_submissions(id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
     student_answer TEXT, -- JSON格式字符串
-    score_awarded REAL
+    score_awarded REAL,
+    time_spent INTEGER DEFAULT 0 -- 答题耗时（秒），用于题目难度分析（PLAN-03）
 );
 
 -- 消息表
@@ -222,3 +223,17 @@ CREATE TABLE IF NOT EXISTS reply_likes (
 
 CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id);
 CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id);
+
+-- AI 解析修改记录表（PLAN-05）
+CREATE TABLE IF NOT EXISTS ai_corrections (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    exam_id        INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    original_json  TEXT NOT NULL,
+    corrected_json TEXT NOT NULL,
+    diff_summary   TEXT NOT NULL DEFAULT '',
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id  ON ai_corrections(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id  ON ai_corrections(exam_id);

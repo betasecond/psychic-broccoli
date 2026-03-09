@@ -2,12 +2,9 @@ package handlers
 
 import (
 	"fmt"
-	"io"
 	"mime/multipart"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/utils"
@@ -64,15 +61,15 @@ const maxFileSize = 10 * 1024 * 1024  // 10MB（普通文件）
 const maxImageSize = 5 * 1024 * 1024  // 5MB（图片）
 const maxAvatarSize = 2 * 1024 * 1024 // 2MB（头像）
 
-// getUploadConfig 根据类型返回上传目录、大小限制和允许的文件类型
-func getUploadConfig(uploadType string) (string, int64, map[string]bool) {
+// getUploadConfig 根据类型返回子目录、大小限制和允许的文件类型
+func getUploadConfig(uploadType string) (subdir string, sizeLimit int64, typeWhitelist map[string]bool) {
 	switch uploadType {
 	case "avatar":
-		return filepath.Join("public", "avatars"), maxAvatarSize, allowedImageTypes
+		return "avatars", maxAvatarSize, allowedImageTypes
 	case "cover":
-		return filepath.Join("public", "covers"), maxImageSize, allowedImageTypes
+		return "covers", maxImageSize, allowedImageTypes
 	default:
-		return filepath.Join("public", "assignments"), maxFileSize, allowedFileTypes
+		return "assignments", maxFileSize, allowedFileTypes
 	}
 }
 
@@ -96,7 +93,7 @@ func UploadFile(c *gin.Context) {
 	}
 
 	// 获取上传配置
-	uploadDir, sizeLimit, typeWhitelist := getUploadConfig(uploadType)
+	subdir, sizeLimit, typeWhitelist := getUploadConfig(uploadType)
 
 	// 检查文件大小
 	if file.Size > sizeLimit {
@@ -111,26 +108,23 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	// 确保上传目录存在
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		utils.InternalServerError(c, "创建上传目录失败")
+	// 打开文件
+	src, err := file.Open()
+	if err != nil {
+		utils.InternalServerError(c, "打开文件失败")
 		return
 	}
+	defer src.Close()
 
-	// 生成唯一文件名：时间戳_用户ID_原文件名
-	timestamp := time.Now().Format("20060102150405")
-	filename := fmt.Sprintf("%s_%v_%s", timestamp, userID, file.Filename)
-	filePath := filepath.Join(uploadDir, filename)
-
-	// 保存文件
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
+	// 使用存储接口保存，文件名带上用户ID以便后续权限验证
+	originalName := fmt.Sprintf("%v_%s", userID, file.Filename)
+	storage := utils.GetStorage()
+	fileURL, err := storage.Save(c.Request.Context(), subdir, originalName, src)
+	if err != nil {
 		utils.InternalServerError(c, "保存文件失败")
 		return
 	}
 
-	// 返回文件访问URL（使用 /public/ 前缀）
-	subDir := filepath.Base(uploadDir)
-	fileURL := fmt.Sprintf("/public/%s/%s", subDir, filename)
 	utils.Success(c, gin.H{
 		"url":      fileURL,
 		"filename": file.Filename,
@@ -166,13 +160,7 @@ func UploadFiles(c *gin.Context) {
 		return
 	}
 
-	// 确保上传目录存在
-	uploadDir := filepath.Join("public", "assignments")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		utils.InternalServerError(c, "创建上传目录失败")
-		return
-	}
-
+	storage := utils.GetStorage()
 	uploadedFiles := []gin.H{}
 	failedFiles := []string{}
 
@@ -190,19 +178,20 @@ func UploadFiles(c *gin.Context) {
 			continue
 		}
 
-		// 生成唯一文件名
-		timestamp := time.Now().Format("20060102150405")
-		filename := fmt.Sprintf("%s_%v_%s", timestamp, userID, file.Filename)
-		filePath := filepath.Join(uploadDir, filename)
+		src, err := file.Open()
+		if err != nil {
+			failedFiles = append(failedFiles, fmt.Sprintf("%s (打开失败)", file.Filename))
+			continue
+		}
 
-		// 保存文件
-		if err := c.SaveUploadedFile(file, filePath); err != nil {
+		originalName := fmt.Sprintf("%v_%s", userID, file.Filename)
+		fileURL, err := storage.Save(c.Request.Context(), "assignments", originalName, src)
+		src.Close()
+		if err != nil {
 			failedFiles = append(failedFiles, fmt.Sprintf("%s (保存失败)", file.Filename))
 			continue
 		}
 
-		// 添加到成功列表
-		fileURL := fmt.Sprintf("/public/assignments/%s", filename)
 		uploadedFiles = append(uploadedFiles, gin.H{
 			"url":      fileURL,
 			"filename": file.Filename,
@@ -266,17 +255,13 @@ func DeleteFile(c *gin.Context) {
 		}
 	}
 
-	// 构建实际文件路径
-	filePath := filepath.Join(".", fileURL)
-
-	// 检查文件是否存在
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	storage := utils.GetStorage()
+	if !storage.Exists(c.Request.Context(), fileURL) {
 		utils.NotFound(c, "文件不存在")
 		return
 	}
 
-	// 删除文件
-	if err := os.Remove(filePath); err != nil {
+	if err := storage.Delete(c.Request.Context(), fileURL); err != nil {
 		utils.InternalServerError(c, "删除文件失败")
 		return
 	}
@@ -304,36 +289,12 @@ func validateFile(file *multipart.FileHeader) error {
 
 // saveFile 保存单个文件（辅助函数）
 func saveFile(c *gin.Context, file *multipart.FileHeader, userID interface{}) (string, error) {
-	// 确保上传目录存在
-	uploadDir := filepath.Join("public", "assignments")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		return "", err
-	}
-
-	// 生成唯一文件名
-	timestamp := time.Now().Format("20060102150405")
-	filename := fmt.Sprintf("%s_%v_%s", timestamp, userID, file.Filename)
-	filePath := filepath.Join(uploadDir, filename)
-
-	// 打开源文件
 	src, err := file.Open()
 	if err != nil {
 		return "", err
 	}
 	defer src.Close()
 
-	// 创建目标文件
-	dst, err := os.Create(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer dst.Close()
-
-	// 复制文件内容
-	if _, err = io.Copy(dst, src); err != nil {
-		return "", err
-	}
-
-	// 返回文件URL
-	return fmt.Sprintf("/public/assignments/%s", filename), nil
+	originalName := fmt.Sprintf("%v_%s", userID, file.Filename)
+	return utils.GetStorage().Save(c.Request.Context(), "assignments", originalName, src)
 }
