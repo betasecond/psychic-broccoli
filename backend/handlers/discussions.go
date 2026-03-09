@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
