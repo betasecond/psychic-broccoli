@@ -147,9 +147,12 @@ type Notification struct {
 
 type Message struct {
 	ID        int64     `json:"id"`
+	UserID    int64     `json:"userId"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
 	Type      string    `json:"type"`
+	Status    string    `json:"status"`
+	Sender    string    `json:"sender"`
 	CreatedAt time.Time `json:"createdAt"`
 	Date      string    `json:"date"`
 }
@@ -189,3 +192,9 @@ type DiscussionReply struct {
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
+
+// Type aliases for handler compatibility
+type AssignmentSubmission = Submission
+type CourseChapter = Chapter
+type CourseCategory = Category
+type ExamQuestion = Question
