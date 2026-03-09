@@ -1,12 +1,14 @@
 import api from './api'
 
-// 类型定义
 export interface Discussion {
   id: number
   title: string
   content?: string
   status: 'OPEN' | 'CLOSED'
-  replyCount: number  // ✅ 修复：改名为 replyCount，避免与 DiscussionDetail 的 replies 冲突
+  replyCount: number
+  views: number
+  likes: number
+  heatScore: number
   createdAt: string
   course?: {
     id: number
@@ -29,7 +31,9 @@ export interface DiscussionReply {
     avatarUrl?: string
   }
   likeCount: number
+  favCount: number
   isLiked: boolean
+  isFavorited: boolean
 }
 
 export interface DiscussionDetail extends Discussion {
@@ -42,58 +46,42 @@ export interface CreateDiscussionRequest {
   content: string
 }
 
-export interface ReplyDiscussionRequest {
-  content: string
-}
-
 class DiscussionService {
-  // 创建讨论
   async createDiscussion(data: CreateDiscussionRequest): Promise<{ id: number }> {
-    const response = await api.post('/discussions', data)
-    return response
+    return await api.post('/discussions', data)
   }
 
-  // 获取讨论列表
   async getDiscussions(params?: {
     courseId?: number
     status?: 'OPEN' | 'CLOSED'
     keyword?: string
+    sort?: 'hot' | 'latest'
   }): Promise<Discussion[]> {
-    const response = await api.get('/discussions', { params })
-    return response
+    return await api.get('/discussions', { params })
   }
 
-  // 获取讨论详情
   async getDiscussionDetail(id: number): Promise<DiscussionDetail> {
-    const response = await api.get(`/discussions/${id}`)
-    return response
+    return await api.get(`/discussions/${id}`)
   }
 
-  // 回复讨论
   async replyDiscussion(id: number, content: string): Promise<DiscussionReply> {
-    const response = await api.post(`/discussions/${id}/replies`, { content })
-    return response
+    return await api.post(`/discussions/${id}/replies`, { content })
   }
 
-  // 关闭讨论
   async closeDiscussion(id: number): Promise<void> {
     await api.put(`/discussions/${id}/close`)
   }
 
-  // 删除讨论
   async deleteDiscussion(id: number): Promise<void> {
     await api.delete(`/discussions/${id}`)
   }
 
-  // 点赞 / 取消点赞回复
-  async likeReply(
-    discussionId: number,
-    replyId: number
-  ): Promise<{ liked: boolean; likeCount: number }> {
-    const response = await api.post(
-      `/discussions/${discussionId}/replies/${replyId}/like`
-    )
-    return response
+  async likeReply(discussionId: number, replyId: number): Promise<{ liked: boolean }> {
+    return await api.post(`/discussions/${discussionId}/replies/${replyId}/like`)
+  }
+
+  async favoriteReply(discussionId: number, replyId: number): Promise<{ favorited: boolean }> {
+    return await api.post(`/discussions/${discussionId}/replies/${replyId}/favorite`)
   }
 }
 

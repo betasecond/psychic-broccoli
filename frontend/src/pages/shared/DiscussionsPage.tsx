@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Form, Input, List, Modal, Select, Space, Tag, Typography, message } from 'antd'
-import { CommentOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Card, Form, Input, List, Modal, Select, Space, Tag, Typography, message, Tooltip, Radio } from 'antd'
+import { CommentOutlined, PlusOutlined, FireOutlined, EyeOutlined, fieldStringOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { discussionService, type Discussion } from '../../services/discussionService'
 import { courseService, type Course } from '../../services/courseService'
@@ -32,12 +32,13 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
   const [courses, setCourses] = useState<Course[]>([])
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [sortBy, setSortBy] = useState<'latest' | 'hot'>('latest')
   const [form] = Form.useForm<CreateDiscussionForm>()
 
   const refresh = async () => {
     setLoading(true)
     try {
-      const data = await discussionService.getDiscussions()
+      const data = await discussionService.getDiscussions({ sort: sortBy })
       setItems(Array.isArray(data) ? data : [])
     } catch (e: any) {
       message.error(e?.message || '获取讨论列表失败')
@@ -48,25 +49,19 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
 
   useEffect(() => {
     refresh()
-  }, [])
+  }, [sortBy])
 
   useEffect(() => {
-    // 课程用于创建讨论时选择。若未登录/无权限，会走错误提示。
     courseService
       .getMyCourses()
       .then(res => setCourses(res?.data?.courses || []))
       .catch(() => {
-        // fallback：用公开课程列表
         courseService.getCourses().then(res => setCourses(res?.data?.courses || [])).catch(() => {})
       })
   }, [])
 
   const courseOptions = useMemo(
-    () =>
-      courses.map(c => ({
-        label: c.title,
-        value: c.id,
-      })),
+    () => courses.map(c => ({ label: c.title, value: c.id })),
     [courses]
   )
 
@@ -90,16 +85,22 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
     <div style={{ padding: 24 }}>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         <Card>
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-            <div>
+          <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+            <div style={{ flex: 1 }}>
               <Title level={3} style={{ margin: 0 }}>
                 <CommentOutlined /> 课堂讨论
               </Title>
               <Text type="secondary">创建、查看与回复课程讨论</Text>
             </div>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-              发起讨论
-            </Button>
+            <Space size="middle">
+              <Radio.Group value={sortBy} onChange={e => setSortBy(e.target.value)} buttonStyle="solid">
+                <Radio.Button value="latest">最新发布</Radio.Button>
+                <Radio.Button value="hot"><FireOutlined /> 热度排序</Radio.Button>
+              </Radio.Group>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+                发起讨论
+              </Button>
+            </Space>
           </Space>
         </Card>
 
@@ -120,16 +121,18 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
                   title={
                     <Space>
                       <span>{item.title}</span>
-                      <Tag color={item.status === 'CLOSED' ? 'default' : 'green'}>
-                        {item.status === 'CLOSED' ? '已关闭' : '进行中'}
-                      </Tag>
+                      <Tag color={item.status === 'CLOSED' ? 'default' : 'green'}>{item.status === 'CLOSED' ? '已关闭' : '进行中'}</Tag>
+                      {item.heatScore > 5 && <Tag color="error" icon={<FireOutlined />}>热门</Tag>}
                     </Space>
                   }
                   description={
                     <Space wrap>
                       <Text type="secondary">课程：{item.course?.title ?? '-'}</Text>
                       <Text type="secondary">作者：{item.author?.username ?? '-'}</Text>
-                      <Text type="secondary">回复：{item.replyCount}</Text>
+                      <Tooltip title="回复数"><Text type="secondary">💬 {item.replyCount}</Text></Tooltip>
+                      <Tooltip title="点赞数"><Text type="secondary">👍 {item.likes ?? 0}</Text></Tooltip>
+                      <Tooltip title="浏览量"><Text type="secondary">👁️ {item.views ?? 0}</Text></Tooltip>
+                      <Tooltip title="热度分"><Text type="danger" strong><FireOutlined /> {item.heatScore?.toFixed(1) ?? '0.0'}</Text></Tooltip>
                       <Text type="secondary">发布：{formatTime(item.createdAt)}</Text>
                     </Space>
                   }
@@ -140,28 +143,11 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
         </Card>
       </Space>
 
-      <Modal
-        title="发起讨论"
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={onCreate}
-        okText="创建"
-        confirmLoading={creating}
-      >
+      <Modal open={open} title="发起讨论" onCancel={() => setOpen(false)} onOk={onCreate} okText="创建" confirmLoading={creating}>
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="courseId"
-            label="所属课程"
-            rules={[{ required: true, message: '请选择课程' }]}
-          >
-            <Select options={courseOptions} placeholder="请选择课程" />
-          </Form.Item>
-          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
-            <Input placeholder="请输入讨论标题" />
-          </Form.Item>
-          <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}>
-            <TextArea rows={4} placeholder="请输入讨论内容" />
-          </Form.Item>
+          <Form.Item name="courseId" label="所属课程" rules={[{ required: true, message: '请选择课程' }]}><Select options={courseOptions} placeholder="请选择课程" /></Form.Item>
+          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}><Input placeholder="请输入讨论标题" /></Form.Item>
+          <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}><TextArea rows={4} placeholder="请输入讨论内容" /></Form.Item>
         </Form>
       </Modal>
     </div>
@@ -169,7 +155,3 @@ const DiscussionsPage: React.FC<Props> = ({ basePath }) => {
 }
 
 export default DiscussionsPage
-
-
-
-

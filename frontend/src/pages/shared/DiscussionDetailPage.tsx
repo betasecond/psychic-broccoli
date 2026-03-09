@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Avatar, Button, Card, Form, Input, List, Space, Tag, Typography, message, Tooltip } from 'antd'
-import { ArrowLeftOutlined, LikeFilled, LikeOutlined, SendOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, LikeFilled, LikeOutlined, StarFilled, StarOutlined, SendOutlined, UserOutlined, RobotOutlined, EyeOutlined, FireOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { discussionService, type DiscussionDetail, type DiscussionReply } from '../../services/discussionService'
 import { useAppSelector } from '../../store'
@@ -52,20 +52,56 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
     refresh()
   }, [discussionId])
 
+  // 乐观 UI 实现：点击即变色，失败回滚
   const handleLike = async (reply: DiscussionReply) => {
     if (!user) {
       message.warning('请先登录')
       return
     }
+
+    const originalReplies = [...replies]
+    const isLiking = !reply.isLiked
+    
+    // 1. 乐观更新
+    setReplies(prev => prev.map(r => 
+      r.id === reply.id 
+        ? { ...r, isLiked: isLiking, likeCount: r.likeCount + (isLiking ? 1 : -1) } 
+        : r
+    ))
+
     try {
-      const result = await discussionService.likeReply(discussionId, reply.id)
-      setReplies(prev => prev.map(r =>
-        r.id === reply.id
-          ? { ...r, isLiked: result.liked, likeCount: result.likeCount }
-          : r
-      ))
-    } catch {
-      message.error('操作失败，请重试')
+      // 2. 后端请求
+      await discussionService.likeReply(discussionId, reply.id)
+    } catch (err: any) {
+      // 3. 失败回滚
+      setReplies(originalReplies)
+      message.error(err?.response?.data?.error || '点赞失败，请重试')
+    }
+  }
+
+  const handleFavorite = async (reply: DiscussionReply) => {
+    if (!user) {
+      message.warning('请先登录')
+      return
+    }
+
+    const originalReplies = [...replies]
+    const isFavoriting = !reply.isFavorited
+
+    // 1. 乐观更新
+    setReplies(prev => prev.map(r => 
+      r.id === reply.id 
+        ? { ...r, isFavorited: isFavoriting, favCount: r.favCount + (isFavoriting ? 1 : -1) } 
+        : r
+    ))
+
+    try {
+      // 2. 后端请求
+      await discussionService.favoriteReply(discussionId, reply.id)
+    } catch (err: any) {
+      // 3. 失败回滚
+      setReplies(originalReplies)
+      message.error(err?.response?.data?.error || '收藏失败，请重试')
     }
   }
 
@@ -103,6 +139,16 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
               </Title>
             </Space>
           }
+          extra={
+            <Space size="middle">
+              <Tooltip title="浏览量">
+                <Text type="secondary"><EyeOutlined /> {discussion?.views ?? 0}</Text>
+              </Tooltip>
+              <Tooltip title="热度值">
+                <Text type="danger"><FireOutlined /> {discussion?.heatScore?.toFixed(1) ?? '0.0'}</Text>
+              </Tooltip>
+            </Space>
+          }
         >
           <Space wrap>
             <Text type="secondary">课程：{discussion?.course?.title ?? '-'}</Text>
@@ -116,30 +162,17 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
             <Text>{discussion?.content}</Text>
           </div>
 
-          {/* AI Enhanced Section [WeiYan Strike] */}
           {(discussion as any)?.aiDraft && (
             <div style={{ marginTop: 16 }}>
               <Tooltip title={`AI Confidence: ${(discussion as any).confidenceScore * 100}%`}>
                 <Alert
-                  message={
-                    <span>
-                      <RobotOutlined style={{ marginRight: 8 }} />
-                      AI 智能摘要
-                    </span>
-                  }
+                  message={<span><RobotOutlined style={{ marginRight: 8 }} />AI 智能摘要</span>}
                   description={
                     <div>
                       <Text italic>{(discussion as any).aiDraft}</Text>
                       {(discussion as any).linkedKnowledge && (
                         <div style={{ marginTop: 8 }}>
-                          <Button 
-                            type="link" 
-                            size="small" 
-                            href={(discussion as any).linkedKnowledge} 
-                            target="_blank"
-                          >
-                            关联知识点
-                          </Button>
+                          <Button type="link" size="small" href={(discussion as any).linkedKnowledge} target="_blank">关联知识点</Button>
                         </div>
                       )}
                     </div>
@@ -148,18 +181,6 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
                   showIcon={false}
                 />
               </Tooltip>
-            </div>
-          )}
-
-          {/* AI Fallback/Degradation [503 Check Mock] */}
-          {discussion && !(discussion as any).aiDraft && (discussion as any).status === 'OPEN' && (
-            <div style={{ marginTop: 16 }}>
-               <Alert
-                message="AI 助手"
-                description="系统繁忙，摘要暂不可用 (503 Service Unavailable)"
-                type="warning"
-                showIcon
-              />
             </div>
           )}
         </Card>
@@ -175,20 +196,24 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
                     key="like"
                     type="text"
                     size="small"
-                    icon={(r.isLiked ?? false) ? <LikeFilled style={{ color: '#1890ff' }} /> : <LikeOutlined />}
+                    icon={r.isLiked ? <LikeFilled style={{ color: '#1890ff' }} /> : <LikeOutlined />}
                     onClick={() => handleLike(r)}
                   >
-                    {(r.likeCount ?? 0) > 0 ? r.likeCount : '点赞'}
+                    {r.likeCount > 0 ? r.likeCount : '点赞'}
+                  </Button>,
+                   <Button
+                    key="favorite"
+                    type="text"
+                    size="small"
+                    icon={r.isFavorited ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+                    onClick={() => handleFavorite(r)}
+                  >
+                    {r.favCount > 0 ? r.favCount : '收藏'}
                   </Button>,
                 ]}
               >
                 <List.Item.Meta
-                  avatar={
-                    <Avatar
-                      src={r.user?.avatarUrl}
-                      icon={!r.user?.avatarUrl && <UserOutlined />}
-                    />
-                  }
+                  avatar={<Avatar src={r.user?.avatarUrl} icon={!r.user?.avatarUrl && <UserOutlined />} />}
                   title={
                     <Space wrap>
                       <Text strong>{r.user?.username ?? `用户#${r.user?.id}`}</Text>
@@ -206,15 +231,10 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
 
         <Card title="发表回复">
           <Form form={form} layout="vertical">
-            <Form.Item
-              name="content"
-              rules={[{ required: true, message: '请输入回复内容' }]}
-            >
+            <Form.Item name="content" rules={[{ required: true, message: '请输入回复内容' }]}>
               <TextArea rows={4} placeholder={canReply ? '请输入回复内容' : '登录后可回复'} disabled={!canReply} />
             </Form.Item>
-            <Button type="primary" icon={<SendOutlined />} onClick={onSubmit} loading={submitting} disabled={!canReply}>
-              发送
-            </Button>
+            <Button type="primary" icon={<SendOutlined />} onClick={onSubmit} loading={submitting} disabled={!canReply}>发送</Button>
           </Form>
         </Card>
       </Space>

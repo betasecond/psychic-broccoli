@@ -2,47 +2,55 @@ package models
 
 import "time"
 
-// User 用户模型
 type User struct {
 	ID           int64     `json:"userId"`
 	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"` // 不返回给前端
-	Email        *string   `json:"email,omitempty"`
-	AvatarURL    *string   `json:"avatarUrl,omitempty"`
+	PasswordHash string    `json:"-"`
 	FullName     *string   `json:"fullName,omitempty"`
+	Email        *string   `json:"email,omitempty"`
 	Phone        *string   `json:"phone,omitempty"`
-	Gender       *string   `json:"gender,omitempty"`
+	Role         string    `json:"role"`
+	AvatarURL    *string   `json:"avatarUrl,omitempty"`
 	Bio          *string   `json:"bio,omitempty"`
-	Role         string    `json:"role"` // STUDENT, INSTRUCTOR, ADMIN
+	Gender       *string   `json:"gender,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
-// Course 课程模型
+type ReplyLike struct {
+	ReplyID   int64     `json:"replyId"`
+	UserID    int64     `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type ReplyFavorite struct {
+	ReplyID   int64     `json:"replyId"`
+	UserID    int64     `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type Course struct {
 	ID             int64     `json:"id"`
 	Title          string    `json:"title"`
 	Description    string    `json:"description"`
-	CoverImageURL  *string   `json:"coverImageUrl,omitempty"`
 	InstructorID   int64     `json:"instructorId"`
-	InstructorName string    `json:"instructorName,omitempty"` // 关联查询
+	InstructorName string    `json:"instructorName,omitempty"`
 	CategoryID     *int64    `json:"categoryId,omitempty"`
-	CategoryName   string    `json:"categoryName,omitempty"` // 关联查询
-	Status         string    `json:"status"` // DRAFT, PUBLISHED, ARCHIVED
-	Enrolled       bool      `json:"enrolled"` // 是否已选修（仅学生）- 移除omitempty以确保false值也被序列化
+	CategoryName   string    `json:"categoryName,omitempty"`
+	Status         string    `json:"status"`
+	CoverImageURL  *string   `json:"coverImageUrl,omitempty"`
+	Enrolled       bool      `json:"enrolled"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
-// CourseCategory 课程分类模型
-type CourseCategory struct {
+type Category struct {
 	ID          int64   `json:"id"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
 }
 
-// CourseEnrollment 选课记录模型
-type CourseEnrollment struct {
+type Enrollment struct {
 	ID         int64     `json:"id"`
 	StudentID  int64     `json:"studentId"`
 	CourseID   int64     `json:"courseId"`
@@ -50,50 +58,45 @@ type CourseEnrollment struct {
 	Progress   int       `json:"progress"`
 }
 
-// CourseChapter 课程章节模型
-type CourseChapter struct {
+type Chapter struct {
 	ID         int64  `json:"id"`
 	CourseID   int64  `json:"courseId"`
 	Title      string `json:"title"`
 	OrderIndex int    `json:"orderIndex"`
 }
 
-// CourseSection 课时模型
-type CourseSection struct {
+type Lesson struct {
 	ID         int64   `json:"id"`
 	ChapterID  int64   `json:"chapterId"`
 	Title      string  `json:"title"`
-	OrderIndex int     `json:"orderIndex"`
-	Type       string  `json:"type"` // VIDEO, LIVE, ASSIGNMENT, EXAM
+	Type       string  `json:"type"`
 	VideoURL   *string `json:"videoUrl,omitempty"`
 	ResourceID *int64  `json:"resourceId,omitempty"`
+	OrderIndex int     `json:"orderIndex"`
 }
 
-// Assignment 作业模型
 type Assignment struct {
-	ID        int64      `json:"id"`
-	CourseID  int64      `json:"courseId"`
-	Title     string     `json:"title"`
-	Content   *string    `json:"content,omitempty"`
-	Deadline  *time.Time `json:"deadline,omitempty"`
-    Attachments *string  `json:"attachments,omitempty"`
-	CreatedAt time.Time  `json:"createdAt"`
+	ID          int64      `json:"id"`
+	CourseID    int64      `json:"courseId"`
+	Title       string     `json:"title"`
+	Content     *string    `json:"content,omitempty"`
+	Attachments *string    `json:"attachments,omitempty"`
+	Deadline    *time.Time `json:"deadline,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
-// AssignmentSubmission 作业提交模型
-type AssignmentSubmission struct {
+type Submission struct {
 	ID           int64     `json:"id"`
 	AssignmentID int64     `json:"assignmentId"`
 	StudentID    int64     `json:"studentId"`
+	StudentName  *string   `json:"studentName,omitempty"`
 	Content      *string   `json:"content,omitempty"`
-	Attachments  *string   `json:"attachments,omitempty"` // JSON字符串
+	Attachments  *string   `json:"attachments,omitempty"`
 	SubmittedAt  time.Time `json:"submittedAt"`
 	Grade        *float64  `json:"grade,omitempty"`
 	Feedback     *string   `json:"feedback,omitempty"`
-	StudentName  *string   `json:"studentName,omitempty"`
 }
 
-// Exam 考试模型
 type Exam struct {
 	ID        int64     `json:"id"`
 	CourseID  int64     `json:"courseId"`
@@ -103,90 +106,86 @@ type Exam struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-// ExamQuestion 考试题目模型
-type ExamQuestion struct {
+type Question struct {
 	ID         int64   `json:"id"`
 	ExamID     int64   `json:"examId"`
-	Type       string  `json:"type"` // SINGLE_CHOICE, MULTIPLE_CHOICE, TRUE_FALSE, SHORT_ANSWER
+	Type       string  `json:"type"`
 	Stem       string  `json:"stem"`
-	Options    *string `json:"options,omitempty"`    // JSON字符串
-	Answer     string  `json:"answer,omitempty"`     // JSON字符串 (给学生时不返回)
+	Options    *string `json:"options,omitempty"`
+	Answer     string  `json:"answer,omitempty"`
 	Score      float64 `json:"score"`
 	OrderIndex int     `json:"orderIndex"`
 }
 
-// ExamSubmission 考卷提交模型
 type ExamSubmission struct {
-	ID         int64     `json:"id"`
-	ExamID     int64     `json:"examId"`
-	StudentID  int64     `json:"studentId"`
+	ID          int64     `json:"id"`
+	ExamID      int64     `json:"examId"`
+	StudentID   int64     `json:"studentId"`
 	SubmittedAt time.Time `json:"submittedAt"`
-	TotalScore *float64  `json:"totalScore,omitempty"`
+	TotalScore  *float64  `json:"totalScore,omitempty"`
 }
 
-// ExamAnswer 考试答案模型
 type ExamAnswer struct {
 	ID            int64    `json:"id"`
 	SubmissionID  int64    `json:"submissionId"`
 	QuestionID    int64    `json:"questionId"`
-	StudentAnswer *string  `json:"studentAnswer,omitempty"` // JSON字符串
+	StudentAnswer *string  `json:"studentAnswer,omitempty"`
 	ScoreAwarded  *float64 `json:"scoreAwarded,omitempty"`
 }
 
-// Message 消息模型
-type Message struct {
+type Notification struct {
 	ID        int64     `json:"id"`
 	UserID    int64     `json:"userId"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
-	Date      string    `json:"date"`
 	Type      string    `json:"type"`
-	Status    string    `json:"status"` // read, unread
+	Status    string    `json:"status"`
 	Sender    string    `json:"sender"`
 	CreatedAt time.Time `json:"createdAt"`
+	Date      string    `json:"date"`
 }
 
-// Notification 通知模型
-type Notification struct {
+type Message struct {
 	ID        int64     `json:"id"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
-	Date      string    `json:"date"`
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"createdAt"`
+	Date      string    `json:"date"`
 }
 
-// Discussion 讨论模型
 type Discussion struct {
-	ID          int64     `json:"id"`
-	Title       string    `json:"title"`
-	Content     string    `json:"content"`
-	CourseID    int64     `json:"courseId"`
-	CourseTitle string    `json:"courseTitle,omitempty"`
-	AuthorID    int64     `json:"authorId"`
-	AuthorName  string    `json:"authorName,omitempty"`
-	Replies     int       `json:"replies"`
-	LastReplyAt *time.Time `json:"lastReplyAt,omitempty"`
-	Status      string    `json:"status"`
-	// AI Enhanced Fields
-	AIDraft     string    `json:"aiDraft,omitempty"`
-	Confidence  float64   `json:"confidenceScore,omitempty"`
-	LinkedKB    string    `json:"linkedKnowledge,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	RepliesList []DiscussionReply `json:"repliesList,omitempty"`
+	ID           int64             `json:"id"`
+	CourseID     int64             `json:"courseId"`
+	CourseTitle  string            `json:"courseTitle,omitempty"`
+	AuthorID     int64             `json:"authorId"`
+	AuthorName   string            `json:"authorName,omitempty"`
+	Title        string            `json:"title"`
+	Content      string            `json:"content"`
+	Status       string            `json:"status"`
+	Replies      int               `json:"replies"`
+	Views        int               `json:"views"`
+	Likes        int               `json:"likes"`
+	HeatScore    float64           `json:"heatScore"`
+	LastReplyAt  *time.Time        `json:"lastReplyAt,omitempty"`
+	CreatedAt    time.Time         `json:"createdAt"`
+	UpdatedAt    time.Time         `json:"updatedAt"`
+	RepliesList  []DiscussionReply `json:"repliesList,omitempty"`
+	LinkedKB     string            `json:"linkedKnowledge,omitempty"`
+	AIDraft      string            `json:"aiDraft,omitempty"`
+	Confidence   float64           `json:"confidenceScore,omitempty"`
 }
 
-// DiscussionReply 讨论回复模型
 type DiscussionReply struct {
 	ID           int64     `json:"id"`
 	DiscussionID int64     `json:"discussionId"`
-	Content      string    `json:"content"`
 	AuthorID     int64     `json:"authorId"`
 	AuthorName   string    `json:"authorName,omitempty"`
+	Content      string    `json:"content"`
+	LikeCount    int       `json:"likeCount"`
+	FavCount     int       `json:"favCount"`
+	IsLiked      bool      `json:"isLiked"`
+	IsFavorited  bool      `json:"isFavorited"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
-	LikeCount    int       `json:"likeCount"`
-	IsLiked      bool      `json:"isLiked"`
 }
-

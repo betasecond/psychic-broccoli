@@ -12,7 +12,20 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
+
+// RateLimiterMiddleware 限流器
+func RateLimiterMiddleware(r rate.Limit, b int) gin.HandlerFunc {
+	limiter := rate.NewLimiter(r, b)
+	return func(c *gin.Context) {
+		if !limiter.Allow() {
+			c.AbortWithStatusJSON(429, gin.H{"error": "操作过于频繁，请稍后再试"})
+			return
+		}
+		c.Next()
+	}
+}
 
 func main() {
 	// 初始化Zap日志
@@ -76,6 +89,9 @@ func main() {
 	r.Static("/public", "./public")
 
 	// API v1路由组
+	// 定义限流器（每秒 10 个请求，负载高峰 20）
+	socialLimiter := RateLimiterMiddleware(10, 20)
+
 	v1 := r.Group("/api/v1")
 	{
 		// 认证路由 (公开)
@@ -233,18 +249,18 @@ func main() {
 		}
 
 		// 讨论路由
-		// Note: Gin routes must include a leading "/" for params, otherwise you'll register "/discussions:id".
 		discussions := v1.Group("/discussions")
 		discussions.Use(middleware.AuthMiddleware())
 		discussions.Use(middleware.AIInterceptor())
 		{
-			discussions.POST("", handlers.CreateDiscussion)            // 创建讨论
-			discussions.GET("", handlers.GetDiscussions)               // 获取讨论列表
-			discussions.GET("/:id", handlers.GetDiscussionDetail)      // 获取讨论详情
-			discussions.POST("/:id/replies", handlers.ReplyDiscussion) // 回复讨论
-			discussions.POST("/:id/replies/:rid/like", handlers.LikeReply) // 点赞/取消点赞
-			discussions.PUT("/:id/close", handlers.CloseDiscussion)    // 关闭讨论
-			discussions.DELETE("/:id", handlers.DeleteDiscussion)      // 删除讨论
+			discussions.POST("", socialLimiter, handlers.CreateDiscussion)            // 创建讨论
+			discussions.GET("", handlers.GetDiscussions)                              // 获取讨论列表
+			discussions.GET("/:id", handlers.GetDiscussionDetail)                     // 获取讨论详情
+			discussions.POST("/:id/replies", socialLimiter, handlers.ReplyDiscussion) // 回复讨论
+			discussions.POST("/:id/replies/:rid/like", socialLimiter, handlers.LikeReply) // 点赞
+			discussions.POST("/:id/replies/:rid/favorite", socialLimiter, handlers.FavoriteReply) // 收藏
+			discussions.PUT("/:id/close", handlers.CloseDiscussion)   // 关闭讨论
+			discussions.DELETE("/:id", handlers.DeleteDiscussion)     // 删除讨论
 		}
 
 		// 文件上传路由
