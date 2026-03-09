@@ -33,6 +33,7 @@ ARG TARGETARCH
 RUN set -eu; \
     export GOOS="${TARGETOS:-linux}"; \
     if [ -n "${TARGETARCH:-}" ]; then export GOARCH="$TARGETARCH"; fi; \
+    go mod tidy && \
     CGO_ENABLED=1 go build \
     -ldflags="-w -s" \
     -o server main.go
