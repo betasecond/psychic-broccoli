@@ -89,8 +89,8 @@ func main() {
 	r.Static("/public", "./public")
 
 	// API v1路由组
-	// 定义限流器（每秒 10 个请求，负载高峰 20）
-	socialLimiter := RateLimiterMiddleware(10, 20)
+	// 定义高频操作限流器（每分钟 20 个请求）
+	socialRateLimiter := middleware.RateLimiterMiddleware(20)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -253,12 +253,12 @@ func main() {
 		discussions.Use(middleware.AuthMiddleware())
 		discussions.Use(middleware.AIInterceptor())
 		{
-			discussions.POST("", socialLimiter, handlers.CreateDiscussion)            // 创建讨论
+			discussions.POST("", socialRateLimiter, handlers.CreateDiscussion)            // 创建讨论
 			discussions.GET("", handlers.GetDiscussions)                              // 获取讨论列表
 			discussions.GET("/:id", handlers.GetDiscussionDetail)                     // 获取讨论详情
-			discussions.POST("/:id/replies", socialLimiter, handlers.ReplyDiscussion) // 回复讨论
-			discussions.POST("/:id/replies/:rid/like", socialLimiter, handlers.LikeReply) // 点赞
-			discussions.POST("/:id/replies/:rid/favorite", socialLimiter, handlers.FavoriteReply) // 收藏
+			discussions.POST("/:id/replies", socialRateLimiter, handlers.ReplyDiscussion) // 回复讨论
+			discussions.POST("/:id/replies/:rid/like", socialRateLimiter, handlers.LikeReply) // 点赞
+			discussions.POST("/:id/replies/:rid/favorite", socialRateLimiter, handlers.FavoriteReply) // 收藏
 			discussions.PUT("/:id/close", handlers.CloseDiscussion)   // 关闭讨论
 			discussions.DELETE("/:id", handlers.DeleteDiscussion)     // 删除讨论
 		}

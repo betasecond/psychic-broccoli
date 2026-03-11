@@ -52,20 +52,26 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
     refresh()
   }, [discussionId])
 
-  // 乐观 UI 实现：点击即变色，失败回滚
+  // 乐观 UI 实现：点击即变色，失败回滚，支持防抖锁定
+  const [interactionLocks, setInteractionLocks] = useState<Record<string, boolean>>({})
+
   const handleLike = async (reply: DiscussionReply) => {
     if (!user) {
       message.warning('请先登录')
       return
     }
 
+    const lockKey = `like-${reply.id}`
+    if (interactionLocks[lockKey]) return
+
     const originalReplies = [...replies]
     const isLiking = !reply.isLiked
     
-    // 1. 乐观更新
+    // 1. 锁定并乐观更新
+    setInteractionLocks(prev => ({ ...prev, [lockKey]: true }))
     setReplies(prev => prev.map(r => 
       r.id === reply.id 
-        ? { ...r, isLiked: isLiking, likeCount: r.likeCount + (isLiking ? 1 : -1) } 
+        ? { ...r, isLiked: isLiking, likeCount: Math.max(0, r.likeCount + (isLiking ? 1 : -1)) } 
         : r
     ))
 
@@ -73,9 +79,15 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
       // 2. 后端请求
       await discussionService.likeReply(discussionId, reply.id)
     } catch (err: any) {
-      // 3. 失败回滚
+      // 3. 失败回滚 - 增加错误原因解析
       setReplies(originalReplies)
-      message.error(err?.response?.data?.error || '点赞失败，请重试')
+      const errorMsg = err?.response?.data?.message || err?.message || '点赞失败'
+      message.error(`${errorMsg}，已撤回操作`)
+    } finally {
+      // 4. 解锁
+      setTimeout(() => {
+        setInteractionLocks(prev => ({ ...prev, [lockKey]: false }))
+      }, 500) // 500ms 强制冷却防止连点
     }
   }
 
@@ -85,13 +97,17 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
       return
     }
 
+    const lockKey = `fav-${reply.id}`
+    if (interactionLocks[lockKey]) return
+
     const originalReplies = [...replies]
     const isFavoriting = !reply.isFavorited
 
-    // 1. 乐观更新
+    // 1. 锁定并乐观更新
+    setInteractionLocks(prev => ({ ...prev, [lockKey]: true }))
     setReplies(prev => prev.map(r => 
       r.id === reply.id 
-        ? { ...r, isFavorited: isFavoriting, favCount: r.favCount + (isFavoriting ? 1 : -1) } 
+        ? { ...r, isFavorited: isFavoriting, favCount: Math.max(0, r.favCount + (isFavoriting ? 1 : -1)) } 
         : r
     ))
 
@@ -101,7 +117,13 @@ const DiscussionDetailPage: React.FC<Props> = ({ backTo }) => {
     } catch (err: any) {
       // 3. 失败回滚
       setReplies(originalReplies)
-      message.error(err?.response?.data?.error || '收藏失败，请重试')
+      const errorMsg = err?.response?.data?.message || err?.message || '收藏失败'
+      message.error(`${errorMsg}，已撤回操作`)
+    } finally {
+      // 4. 解锁
+      setTimeout(() => {
+        setInteractionLocks(prev => ({ ...prev, [lockKey]: false }))
+      }, 500)
     }
   }
 

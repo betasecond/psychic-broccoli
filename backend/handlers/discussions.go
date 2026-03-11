@@ -25,24 +25,28 @@ func normalizeStatus(s string) string {
 	}
 }
 
-// CalculateHeatScore 实现逻辑：(Views*0.2 + Likes*0.5 + Replies*0.8) / (Time+2)^1.5
-// Time 为创建至今的天数
-func CalculateHeatScore(views int, likes int, replies int, createdAt time.Time) float64 {
-	timeElapsed := time.Since(createdAt).Hours() / 24.0
-	score := (float64(views)*0.2 + float64(likes)*0.5 + float64(replies)*0.8) / math.Pow(timeElapsed+2, 1.5)
+// CalculateHeatScore 实现逻辑：(Views*0.2 + Likes*0.5 + Replies*1.0 + Favorites*1.5) / (ln(TimeElapsed+1.5) + 1)^1.8
+// Time 为创建至今的小时数，Favorites 纳入分值体系，ln 衰减使新帖在短期内更容易获得展示
+func CalculateHeatScore(views int, likes int, replies int, favorites int, createdAt time.Time) float64 {
+	timeElapsedHours := time.Since(createdAt).Hours()
+	// 使用自然对数对时间进行平滑处理，防止旧帖分值断崖式下跌，同时对新帖加权
+	timeFactor := math.Pow(math.Log(timeElapsedHours+1.5)+1, 1.8)
+	
+	// 权重分配：收藏(1.5) > 回复(1.0) > 点赞(0.5) > 浏览(0.2)
+	score := (float64(views)*0.2 + float64(likes)*0.5 + float64(replies)*1.0 + float64(favorites)*1.5) / timeFactor
 	return score
 }
 
 // 更新讨论热度分（原子更新基础上的重算）
 func refreshDiscussionHeat(id int64) {
-	var views, likes, replies int
+	var views, likes, replies, favorites int
 	var createdAt time.Time
 	err := database.DB.QueryRow(
-		"SELECT views, likes, replies, created_at FROM discussions WHERE id = ?",
+		"SELECT views, likes, replies, favorites, created_at FROM discussions WHERE id = ?",
 		id,
-	).Scan(&views, &likes, &replies, &createdAt)
+	).Scan(&views, &likes, &replies, &favorites, &createdAt)
 	if err == nil {
-		hs := CalculateHeatScore(views, likes, replies, createdAt)
+		hs := CalculateHeatScore(views, likes, replies, favorites, createdAt)
 		database.DB.Exec("UPDATE discussions SET heat_score = ? WHERE id = ?", hs, id)
 	}
 }
@@ -453,12 +457,25 @@ func LikeReply(c *gin.Context) {
 		liked = false
 	}
 
-	tx.Commit()
-
 	// 关联主帖的热度也顺便刷一下
 	var dID int64
-	database.DB.QueryRow("SELECT discussion_id FROM discussion_replies WHERE id = ?", replyID).Scan(&dID)
-	go refreshDiscussionHeat(dID)
+	tx.QueryRow("SELECT discussion_id FROM discussion_replies WHERE id = ?", replyID).Scan(&dID)
+
+	// 将回复的点赞权重部分映射到主帖的点赞数上
+	if liked {
+		tx.Exec("UPDATE discussions SET likes = likes + 1 WHERE id = ?", dID)
+	} else {
+		tx.Exec("UPDATE discussions SET likes = CASE WHEN likes > 0 THEN likes - 1 ELSE 0 END WHERE id = ?", dID)
+	}
+	
+	if err := tx.Commit(); err != nil {
+		utils.InternalServerError(c, "提交事务失败")
+		return
+	}
+
+	if dID > 0 {
+		go refreshDiscussionHeat(dID)
+	}
 
 	utils.Success(c, gin.H{"liked": liked})
 }
@@ -485,7 +502,25 @@ func FavoriteReply(c *gin.Context) {
 		favorited = false
 	}
 
-	tx.Commit()
+	// 映射到主帖的收藏权重
+	var dID int64
+	tx.QueryRow("SELECT discussion_id FROM discussion_replies WHERE id = ?", replyID).Scan(&dID)
+	
+	if favorited {
+		tx.Exec("UPDATE discussions SET favorites = favorites + 1 WHERE id = ?", dID)
+	} else {
+		tx.Exec("UPDATE discussions SET favorites = CASE WHEN favorites > 0 THEN favorites - 1 ELSE 0 END WHERE id = ?", dID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.InternalServerError(c, "提交事务失败")
+		return
+	}
+
+	if dID > 0 {
+		go refreshDiscussionHeat(dID)
+	}
+
 	utils.Success(c, gin.H{"favorited": favorited})
 }
 
