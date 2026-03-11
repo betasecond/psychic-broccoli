@@ -7,13 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/utils"
+	"go.uber.org/zap"
 )
 
 // RateLimiterMiddleware 针对关键社交操作的简单内存限流器
 // 如果线上使用建议配合 Redis 实现分布式限流
 func RateLimiterMiddleware(requestsPerMinute int) gin.HandlerFunc {
 	// 简单的内存存储：key -> [timestamps]
-	// 注意：生产环境应使用 redis.FixedWindow 或 redis.SlidingWindow
 	var (
 		userRequests = make(map[string][]time.Time)
 	)
@@ -41,8 +41,8 @@ func RateLimiterMiddleware(requestsPerMinute int) gin.HandlerFunc {
 
 		if len(validRequests) >= requestsPerMinute {
 			utils.GetLogger().Warn("Rate limit exceeded", 
-				utils.String field("key", key),
-				utils.Int field("count", len(validRequests)))
+				zap.String("key", key),
+				zap.Int("count", len(validRequests)))
 			
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   "请求过于频繁",
