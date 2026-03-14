@@ -136,7 +136,7 @@ func GetDiscussions(c *gin.Context) {
 	sort := c.Query("sort") // hot, latest
 
 	query := `
-		SELECT d.id, d.title, d.content, d.status, d.replies, d.views, d.likes, d.heat_score, d.created_at,
+		SELECT d.id, d.title, d.content, d.status, d.replies, d.views, d.likes, d.favorites, d.heat_score, d.created_at,
 			   d.course_id, c.title as course_title,
 			   d.author_id, u.username, u.avatar_url
 		FROM discussions d
@@ -165,7 +165,7 @@ func GetDiscussions(c *gin.Context) {
 
 	if keyword != "" {
 		query += " AND (d.title LIKE ? OR d.content LIKE ?)"
-		args = append(args, "%"+keyword+"%", "%"+keyword+"%")
+		args = append(args, "%" + keyword + "%", "%" + keyword + "%")
 	}
 
 	if sort == "hot" {
@@ -194,6 +194,7 @@ func GetDiscussions(c *gin.Context) {
 			Replies     int
 			Views       int
 			Likes       int
+			Favorites   int
 			HeatScore   float64
 			CreatedAt   time.Time
 			CourseID    sql.NullInt64
@@ -203,9 +204,10 @@ func GetDiscussions(c *gin.Context) {
 			AvatarURL   sql.NullString
 		}
 
-		err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Status, &d.Replies, &d.Views, &d.Likes, &d.HeatScore, &d.CreatedAt,
+		err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Status, &d.Replies, &d.Views, &d.Likes, &d.Favorites, &d.HeatScore, &d.CreatedAt,
 			&d.CourseID, &d.CourseTitle, &d.UserID, &d.Username, &d.AvatarURL)
 		if err != nil {
+			utils.GetLogger().Error("扫描讨论列表行失败", zap.Error(err))
 			continue
 		}
 
