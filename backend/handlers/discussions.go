@@ -39,6 +39,12 @@ func CalculateHeatScore(views int, likes int, replies int, favorites int, create
 
 // 更新讨论热度分（原子更新基础上的重算）
 func refreshDiscussionHeat(id int64) {
+	defer func() {
+		if r := recover(); r != nil {
+			utils.GetLogger().Error("refreshDiscussionHeat panic recovered", zap.Any("panic", r))
+		}
+	}()
+
 	var views, likes, replies, favorites int
 	var createdAt time.Time
 	err := database.DB.QueryRow(
@@ -101,10 +107,10 @@ func CreateDiscussion(c *gin.Context) {
 		}
 	}
 
-	// 插入讨论
+	// 插入讨论 (修复：补全 favorites 字段及其初始值)
 	result, err := database.DB.Exec(`
-		INSERT INTO discussions (course_id, author_id, title, content, status, replies, views, likes, heat_score)
-		VALUES (?, ?, ?, ?, 'active', 0, 0, 0, 0.0)
+		INSERT INTO discussions (course_id, author_id, title, content, status, replies, views, likes, favorites, heat_score)
+		VALUES (?, ?, ?, ?, 'active', 0, 0, 0, 0, 0.0)
 	`, req.CourseID, userID, req.Title, req.Content)
 
 	if err != nil {
