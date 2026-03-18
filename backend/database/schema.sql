@@ -237,3 +237,40 @@ CREATE TABLE IF NOT EXISTS ai_corrections (
 
 CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id  ON ai_corrections(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id  ON ai_corrections(exam_id);
+
+-- RAG 知识库表（"评-辅"闭环系统）
+CREATE TABLE IF NOT EXISTS rag_documents (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    filename    TEXT NOT NULL,
+    char_count  INTEGER NOT NULL DEFAULT 0,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id      INTEGER NOT NULL REFERENCES rag_documents(id) ON DELETE CASCADE,
+    course_id   INTEGER NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    content     TEXT NOT NULL,
+    embedding   TEXT,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rag_queries (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id    INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question     TEXT NOT NULL,
+    answer       TEXT,
+    source_chunks TEXT,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_documents_course_id ON rag_documents(course_id);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_doc_id       ON rag_chunks(doc_id);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_course_id    ON rag_chunks(course_id);
+CREATE INDEX IF NOT EXISTS idx_rag_queries_course_id   ON rag_queries(course_id);
+CREATE INDEX IF NOT EXISTS idx_rag_queries_user_id     ON rag_queries(user_id);

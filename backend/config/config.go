@@ -11,16 +11,20 @@ type Config struct {
 	JWTSecret  string
 	EnableSeed      bool
 	AnthropicAPIKey string
+	OpenAIAPIKey    string // OPENAI_API_KEY 环境变量
+	OpenAIBaseURL   string // OPENAI_BASE_URL，默认 https://api.openai.com/v1
 }
 
 // Load 加载配置
 func Load() *Config {
 	return &Config{
-		ServerPort: getEnv("SERVER_PORT", "8080"),
-		DBPath:     getEnv("DB_PATH", "./database/education.db"),
-		JWTSecret:  getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		ServerPort:      getEnv("SERVER_PORT", "8080"),
+		DBPath:          getEnv("DB_PATH", "./database/education.db"),
+		JWTSecret:       getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		EnableSeed:      getEnvBool("ENABLE_SEED", false),
 		AnthropicAPIKey: getEnv("ANTHROPIC_API_KEY", ""),
+		OpenAIAPIKey:    getEnv("OPENAI_API_KEY", ""),
+		OpenAIBaseURL:   getEnv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
 	}
 }
 

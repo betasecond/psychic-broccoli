@@ -159,6 +159,12 @@ func main() {
 				authenticated.POST("/:id/chapters/:cid/sections", handlers.CreateSection)
 				authenticated.PUT("/:id/chapters/:cid/sections/:sid", handlers.UpdateSection)
 				authenticated.DELETE("/:id/chapters/:cid/sections/:sid", handlers.DeleteSection)
+				// RAG 知识库路由
+				authenticated.POST("/:id/rag/documents", handlers.UploadRAGDocument)
+				authenticated.GET("/:id/rag/documents", handlers.ListRAGDocuments)
+				authenticated.DELETE("/:id/rag/documents/:docId", handlers.DeleteRAGDocument)
+				authenticated.POST("/:id/rag/query", handlers.QueryRAG)
+				authenticated.GET("/:id/rag/queries", handlers.GetRAGQueryHistory)
 			}
 		}
 

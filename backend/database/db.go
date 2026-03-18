@@ -132,6 +132,52 @@ func autoMigrate() error {
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id ON ai_corrections(user_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id ON ai_corrections(exam_id)`)
 
+	// 8. RAG 知识库三表 — 确保旧容器也能建表
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS rag_documents (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+			filename    TEXT NOT NULL,
+			char_count  INTEGER NOT NULL DEFAULT 0,
+			chunk_count INTEGER NOT NULL DEFAULT 0,
+			created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 rag_documents 表失败: %v", err)
+	}
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS rag_chunks (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			doc_id      INTEGER NOT NULL REFERENCES rag_documents(id) ON DELETE CASCADE,
+			course_id   INTEGER NOT NULL,
+			chunk_index INTEGER NOT NULL,
+			content     TEXT NOT NULL,
+			embedding   TEXT,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 rag_chunks 表失败: %v", err)
+	}
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS rag_queries (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			course_id     INTEGER NOT NULL,
+			user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			question      TEXT NOT NULL,
+			answer        TEXT,
+			source_chunks TEXT,
+			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 rag_queries 表失败: %v", err)
+	}
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_documents_course_id ON rag_documents(course_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_chunks_doc_id       ON rag_chunks(doc_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_chunks_course_id    ON rag_chunks(course_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_queries_course_id   ON rag_queries(course_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_queries_user_id     ON rag_queries(user_id)`)
+
 	return nil
 }
 
