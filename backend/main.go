@@ -7,7 +7,9 @@ import (
 	"github.com/online-education-platform/backend/config"
 	"github.com/online-education-platform/backend/database"
 	"github.com/online-education-platform/backend/handlers"
+	otel_internal "github.com/online-education-platform/backend/internal/otel"
 	"github.com/online-education-platform/backend/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"github.com/online-education-platform/backend/utils"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -33,14 +35,14 @@ func main() {
 	logger := utils.GetLogger()
 	defer logger.Sync() // 刷新缓存
 
-	// 初始化Telemetry
-	shutdown, err := utils.InitTelemetry("backend-service")
+	// 初始化 OpenTelemetry (补齐论文观测性缺失)
+	tp, err := otel_internal.InitTracer()
 	if err != nil {
-		logger.Fatal("Telemetry 初始化失败", zap.Error(err))
+		log.Fatalf("failed to initialize tracer: %v", err)
 	}
 	defer func() {
-		if err := shutdown(context.Background()); err != nil {
-			logger.Error("Telemetry 关闭失败", zap.Error(err))
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
 
