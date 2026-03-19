@@ -14,32 +14,6 @@ export const initFrontendTracer = () => {
     }),
   });
 
-  // 使用 OTLP 导出器 (如果后端配置了 Collector)
-  // 演示环境默认先配置，即使没有 Collector 也不影响 UI 渲染
-  const exporter = new OTLPTraceExporter({
-    url: '/api/v1/otel/traces',
-  });
-
-  provider.addSpanProcessor(new BatchSpanProcessor(exporter));
-
-  provider.register();
-
-  registerInstrumentations({
-    instrumentations: [
-      new DocumentLoadInstrumentation(),
-      new FetchInstrumentation({
-        ignoreUrls: [/localhost:5173/],
-        propagateTraceHeaderCorsUrls: [/.*/],
-      }),
-    ],
-  });
-
-  console.log('[OTEL] Frontend Tracing Initialized.');
-};
-
-
-  // 使用 OTLP 导出器 (如果后端配置了 Collector) 
-  // 演示环境默认先配置，即使没有 Collector 也不影响 UI 渲染
   const exporter = new OTLPTraceExporter({
     url: '/api/v1/otel/traces',
   });
