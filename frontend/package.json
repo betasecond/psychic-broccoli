@@ -27,6 +27,7 @@
     "@opentelemetry/sdk-trace-base": "^2.2.0",
     "@opentelemetry/sdk-trace-web": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.54.0",
     "@reduxjs/toolkit": "^2.9.0",
     "antd": "^5.27.3",
     "axios": "^1.11.0",
