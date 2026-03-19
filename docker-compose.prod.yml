@@ -29,6 +29,8 @@ services:
       - "JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}"
       - GIN_MODE=release
       - ENABLE_SEED=${ENABLE_SEED:-false}
+      - "OPENAI_API_KEY=${OPENAI_API_KEY:-}"
+      - "OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
     volumes:
       # Persist SQLite database
       - sqlite_data:/data
