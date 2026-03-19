@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/database"
-	"github.com/online-education-platform/backend/internal/rag"
 	original_rag "github.com/online-education-platform/backend/rag"
 	"github.com/online-education-platform/backend/utils"
 	"go.uber.org/zap"
