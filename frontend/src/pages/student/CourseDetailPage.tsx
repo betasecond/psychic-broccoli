@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, Space, Spin, Tag, Button, Progress, message, List, Collapse } from 'antd';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  Card, Row, Col, Typography, Space, Spin, Tag, Button, Progress,
+  message, List, Collapse, Tabs, Input, Divider, Empty, Tooltip,
+} from 'antd';
 import {
   BookOutlined,
   UserOutlined,
@@ -10,13 +13,26 @@ import {
   PlayCircleOutlined,
   FileTextOutlined,
   DownOutlined,
+  SendOutlined,
+  RobotOutlined,
+  HistoryOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { courseService, type CourseSection } from '../../services/courseService';
 import { progressService } from '../../services/progressService';
+import ragService, { type RagQueryHistory } from '../../services/ragService';
 
 const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
+const { TextArea } = Input;
+
+interface QAItem {
+  question: string;
+  answer: string;
+  sources: string[];
+  loading?: boolean;
+}
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,12 +46,22 @@ const CourseDetailPage: React.FC = () => {
   const [submitting, setSubmitting] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<CourseSection | null>(null);
 
+  // RAG 状态
+  const [qaList, setQaList] = useState<QAItem[]>([]);
+  const [question, setQuestion] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [history, setHistory] = useState<RagQueryHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('chapters');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  const courseId = Number(id);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
       setLoading(true);
       try {
-        const courseId = Number(id);
         const [courseRes, chaptersRes] = await Promise.all([
           courseService.getCourse(courseId),
           courseService.getChapters(courseId),
@@ -45,7 +71,6 @@ const CourseDetailPage: React.FC = () => {
         const chapterList = Array.isArray(chData) ? chData : (chData?.chapters || []);
         setChapters(chapterList);
 
-        // 批量加载每章节的课时
         const map: Record<number, CourseSection[]> = {};
         await Promise.all(
           chapterList.map(async (ch: any) => {
@@ -58,7 +83,6 @@ const CourseDetailPage: React.FC = () => {
         );
         setSections(map);
 
-        // 获取我的课程列表来获取进度
         const myCoursesRes = await courseService.getMyCourses();
         const myCourse = myCoursesRes.courses.find((c: any) => c.id === courseId);
         if (myCourse) {
@@ -71,6 +95,47 @@ const CourseDetailPage: React.FC = () => {
     };
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [qaList]);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await ragService.getHistory(courseId);
+      setHistory(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      message.error(e?.message || '加载历史失败');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleAsk = async () => {
+    const q = question.trim();
+    if (!q) return;
+    setQuestion('');
+    const placeholder: QAItem = { question: q, answer: '', sources: [], loading: true };
+    setQaList(prev => [...prev, placeholder]);
+    setAsking(true);
+    try {
+      const result = await ragService.query(courseId, q);
+      setQaList(prev => [
+        ...prev.slice(0, -1),
+        { question: q, answer: result.answer, sources: result.sources, loading: false },
+      ]);
+    } catch (e: any) {
+      setQaList(prev => [
+        ...prev.slice(0, -1),
+        { question: q, answer: `请求失败：${e?.message || '未知错误'}`, sources: [], loading: false },
+      ]);
+    } finally {
+      setAsking(false);
+    }
+  };
 
   const handleCompleteChapter = async (chapterId: number) => {
     setSubmitting(chapterId);
@@ -107,6 +172,141 @@ const CourseDetailPage: React.FC = () => {
       ? <Tag icon={<PlayCircleOutlined />} color="blue" style={{ marginRight: 0 }}>视频</Tag>
       : <Tag icon={<FileTextOutlined />} color="green" style={{ marginRight: 0 }}>图文</Tag>;
 
+  // ── 知识库问答 Tab ──
+  const ragTab = (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '560px' }}>
+      {/* 对话区 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0', marginBottom: 12 }}>
+        {qaList.length === 0 && (
+          <Empty
+            image={<DatabaseOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
+            imageStyle={{ height: 56 }}
+            description={
+              <Text type="secondary">
+                在下方输入问题，AI 将根据课程知识库为你解答
+              </Text>
+            }
+            style={{ marginTop: 60 }}
+          />
+        )}
+        {qaList.map((item, idx) => (
+          <div key={idx} style={{ marginBottom: 16 }}>
+            {/* 问题 */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+              <div style={{
+                background: '#1890ff', color: '#fff', padding: '8px 14px',
+                borderRadius: '16px 16px 4px 16px', maxWidth: '75%', fontSize: 14,
+              }}>
+                {item.question}
+              </div>
+            </div>
+            {/* 回答 */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <RobotOutlined style={{ fontSize: 20, color: '#1890ff', marginTop: 6, flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                {item.loading ? (
+                  <Spin size="small" style={{ marginLeft: 4 }} />
+                ) : (
+                  <div style={{
+                    background: '#f5f5f5', padding: '8px 14px',
+                    borderRadius: '4px 16px 16px 16px', fontSize: 14, whiteSpace: 'pre-wrap',
+                  }}>
+                    {item.answer}
+                  </div>
+                )}
+                {!item.loading && item.sources.length > 0 && (
+                  <div style={{ marginTop: 6 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>参考片段：</Text>
+                    {item.sources.map((src, i) => (
+                      <Tooltip key={i} title={src} overlayStyle={{ maxWidth: 400 }}>
+                        <Tag style={{ cursor: 'pointer', marginTop: 4, fontSize: 11 }}>
+                          [{i + 1}] {src.slice(0, 30)}{src.length > 30 ? '…' : ''}
+                        </Tag>
+                      </Tooltip>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={chatBottomRef} />
+      </div>
+
+      {/* 输入区 */}
+      <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+        <Space.Compact style={{ width: '100%' }}>
+          <TextArea
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            placeholder="输入问题，按 Ctrl+Enter 发送"
+            autoSize={{ minRows: 2, maxRows: 4 }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                handleAsk();
+              }
+            }}
+            disabled={asking}
+            style={{ resize: 'none' }}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={handleAsk}
+            loading={asking}
+            disabled={!question.trim()}
+            style={{ height: 'auto', alignSelf: 'flex-end' }}
+          >
+            发送
+          </Button>
+        </Space.Compact>
+
+        {/* 历史记录 */}
+        <div style={{ marginTop: 8 }}>
+          <Button
+            size="small"
+            type="link"
+            icon={<HistoryOutlined />}
+            onClick={loadHistory}
+            loading={historyLoading}
+            style={{ padding: 0 }}
+          >
+            查看历史记录
+          </Button>
+          {history.length > 0 && (
+            <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' }}>
+              <List
+                size="small"
+                dataSource={history}
+                renderItem={h => (
+                  <List.Item
+                    key={h.id}
+                    style={{ cursor: 'pointer', padding: '4px 8px' }}
+                    onClick={() => setQaList(prev => [...prev, {
+                      question: h.question,
+                      answer: h.answer,
+                      sources: [],
+                    }])}
+                  >
+                    <List.Item.Meta
+                      title={<Text style={{ fontSize: 13 }}>{h.question}</Text>}
+                      description={
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {h.created_at?.slice(0, 10)}
+                        </Text>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: '24px' }}>
       <Space style={{ marginBottom: '24px' }}>
@@ -116,7 +316,7 @@ const CourseDetailPage: React.FC = () => {
       </Space>
 
       <Row gutter={[16, 16]}>
-        {/* ── 左栏：课程详情 + 章节/课时 ── */}
+        {/* ── 左栏：课程详情 + Tabs ── */}
         <Col xs={24} lg={16}>
           <Card>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -151,107 +351,132 @@ const CourseDetailPage: React.FC = () => {
                 </Text>
               </div>
 
-              {/* 课程章节 + 课时 */}
-              <div>
-                <Title level={4}>课程章节</Title>
-                {chapters.length > 0 ? (
-                  <Collapse
-                    accordion={false}
-                    expandIcon={({ isActive }) => <DownOutlined rotate={isActive ? 180 : 0} />}
-                  >
-                    {chapters.map((chapter: any) => {
-                      const isCompleted = completedChapters.has(chapter.id);
-                      const chSections = sections[chapter.id] || [];
-                      return (
-                        <Panel
-                          key={chapter.id}
-                          header={
-                            <Space>
-                              {isCompleted
-                                ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                                : <FolderOpenOutlined style={{ color: '#1890ff' }} />}
-                              <Text strong>第 {chapter.orderIndex} 章</Text>
-                              <Text>{chapter.title}</Text>
-                              {isCompleted && <Tag color="green">已完成</Tag>}
-                              {chSections.length > 0 && (
-                                <Tag color="default">{chSections.length} 课时</Tag>
-                              )}
-                            </Space>
-                          }
-                          extra={
-                            <span onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                type={isCompleted ? 'default' : 'primary'}
-                                size="small"
-                                icon={isCompleted ? <CheckCircleOutlined /> : <ClockCircleOutlined />}
-                                loading={submitting === chapter.id}
-                                onClick={() => handleCompleteChapter(chapter.id)}
-                                disabled={isCompleted}
-                              >
-                                {isCompleted ? '已完成' : '标记完成'}
-                              </Button>
-                            </span>
-                          }
-                        >
-                          {/* 课时列表 */}
-                          {chSections.length === 0 ? (
-                            <Text type="secondary" style={{ paddingLeft: 8 }}>本章节暂无课时</Text>
-                          ) : (
-                            <List
-                              size="small"
-                              dataSource={chSections}
-                              renderItem={(sec) => (
-                                <List.Item
-                                  key={sec.id}
-                                  style={{
-                                    cursor: sec.type === 'VIDEO' || sec.type === 'TEXT' ? 'pointer' : 'default',
-                                    background: activeSection?.id === sec.id ? '#f0f5ff' : 'transparent',
-                                    borderRadius: 4,
-                                    padding: '8px 12px',
-                                  }}
-                                  onClick={() => setActiveSection(activeSection?.id === sec.id ? null : sec)}
-                                >
-                                  <List.Item.Meta
-                                    avatar={sectionTypeTag(sec.type)}
-                                    title={
-                                      <Text style={{ fontSize: 14 }}>
-                                        {sec.orderIndex}. {sec.title}
-                                      </Text>
-                                    }
-                                  />
-                                </List.Item>
-                              )}
-                            />
-                          )}
+              <Divider style={{ margin: '0' }} />
 
-                          {/* 课时内容展示（点击课时后显示） */}
-                          {chSections.some(s => s.id === activeSection?.id) && activeSection && (
-                            <div style={{ marginTop: 12, padding: '16px', background: '#fafafa', borderRadius: 8 }}>
-                              <Title level={5} style={{ marginTop: 0 }}>{activeSection.title}</Title>
-                              {activeSection.type === 'VIDEO' && activeSection.videoUrl ? (
-                                <div>
-                                  <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>视频链接：</Text>
-                                  <a href={activeSection.videoUrl} target="_blank" rel="noopener noreferrer">
-                                    {activeSection.videoUrl}
-                                  </a>
-                                </div>
-                              ) : activeSection.type === 'TEXT' && activeSection.content ? (
-                                <Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
-                                  {activeSection.content}
-                                </Paragraph>
-                              ) : (
-                                <Text type="secondary">暂无内容</Text>
-                              )}
-                            </div>
-                          )}
-                        </Panel>
-                      );
-                    })}
-                  </Collapse>
-                ) : (
-                  <Text type="secondary">暂无章节</Text>
-                )}
-              </div>
+              {/* Tabs: 课程章节 / 知识库问答 */}
+              <Tabs
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                items={[
+                  {
+                    key: 'chapters',
+                    label: (
+                      <Space>
+                        <FolderOpenOutlined />
+                        课程章节
+                      </Space>
+                    ),
+                    children: (
+                      <div>
+                        {chapters.length > 0 ? (
+                          <Collapse
+                            accordion={false}
+                            expandIcon={({ isActive }) => <DownOutlined rotate={isActive ? 180 : 0} />}
+                          >
+                            {chapters.map((chapter: any) => {
+                              const isCompleted = completedChapters.has(chapter.id);
+                              const chSections = sections[chapter.id] || [];
+                              return (
+                                <Panel
+                                  key={chapter.id}
+                                  header={
+                                    <Space>
+                                      {isCompleted
+                                        ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                                        : <FolderOpenOutlined style={{ color: '#1890ff' }} />}
+                                      <Text strong>第 {chapter.orderIndex} 章</Text>
+                                      <Text>{chapter.title}</Text>
+                                      {isCompleted && <Tag color="green">已完成</Tag>}
+                                      {chSections.length > 0 && (
+                                        <Tag color="default">{chSections.length} 课时</Tag>
+                                      )}
+                                    </Space>
+                                  }
+                                  extra={
+                                    <span onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        type={isCompleted ? 'default' : 'primary'}
+                                        size="small"
+                                        icon={isCompleted ? <CheckCircleOutlined /> : <ClockCircleOutlined />}
+                                        loading={submitting === chapter.id}
+                                        onClick={() => handleCompleteChapter(chapter.id)}
+                                        disabled={isCompleted}
+                                      >
+                                        {isCompleted ? '已完成' : '标记完成'}
+                                      </Button>
+                                    </span>
+                                  }
+                                >
+                                  {chSections.length === 0 ? (
+                                    <Text type="secondary" style={{ paddingLeft: 8 }}>本章节暂无课时</Text>
+                                  ) : (
+                                    <List
+                                      size="small"
+                                      dataSource={chSections}
+                                      renderItem={(sec) => (
+                                        <List.Item
+                                          key={sec.id}
+                                          style={{
+                                            cursor: sec.type === 'VIDEO' || sec.type === 'TEXT' ? 'pointer' : 'default',
+                                            background: activeSection?.id === sec.id ? '#f0f5ff' : 'transparent',
+                                            borderRadius: 4,
+                                            padding: '8px 12px',
+                                          }}
+                                          onClick={() => setActiveSection(activeSection?.id === sec.id ? null : sec)}
+                                        >
+                                          <List.Item.Meta
+                                            avatar={sectionTypeTag(sec.type)}
+                                            title={
+                                              <Text style={{ fontSize: 14 }}>
+                                                {sec.orderIndex}. {sec.title}
+                                              </Text>
+                                            }
+                                          />
+                                        </List.Item>
+                                      )}
+                                    />
+                                  )}
+                                  {chSections.some(s => s.id === activeSection?.id) && activeSection && (
+                                    <div style={{ marginTop: 12, padding: '16px', background: '#fafafa', borderRadius: 8 }}>
+                                      <Title level={5} style={{ marginTop: 0 }}>{activeSection.title}</Title>
+                                      {activeSection.type === 'VIDEO' && activeSection.videoUrl ? (
+                                        <div>
+                                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>视频链接：</Text>
+                                          <a href={activeSection.videoUrl} target="_blank" rel="noopener noreferrer">
+                                            {activeSection.videoUrl}
+                                          </a>
+                                        </div>
+                                      ) : activeSection.type === 'TEXT' && activeSection.content ? (
+                                        <Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+                                          {activeSection.content}
+                                        </Paragraph>
+                                      ) : (
+                                        <Text type="secondary">暂无内容</Text>
+                                      )}
+                                    </div>
+                                  )}
+                                </Panel>
+                              );
+                            })}
+                          </Collapse>
+                        ) : (
+                          <Text type="secondary">暂无章节</Text>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'rag',
+                    label: (
+                      <Space>
+                        <DatabaseOutlined />
+                        知识库问答
+                      </Space>
+                    ),
+                    children: ragTab,
+                  },
+                ]}
+              />
             </Space>
           </Card>
         </Col>

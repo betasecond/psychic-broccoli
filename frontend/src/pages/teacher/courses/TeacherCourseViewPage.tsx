@@ -2,15 +2,18 @@ import React, { useEffect, useState } from 'react'
 import {
   Card, Row, Col, Typography, Space, Spin, Tag, Button,
   Collapse, List, Statistic, Divider, message, Badge,
+  Upload, Table, Popconfirm,
 } from 'antd'
 import {
   ArrowLeftOutlined, EditOutlined, BookOutlined,
   PlayCircleOutlined, FileTextOutlined, TeamOutlined,
   FolderOpenOutlined, BarChartOutlined, FileOutlined,
   DownOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  UploadOutlined, DeleteOutlined, DatabaseOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { courseService, type CourseSection } from '@/services/courseService'
+import ragService, { type RagDocument } from '@/services/ragService'
 
 const { Title, Text, Paragraph } = Typography
 const { Panel } = Collapse
@@ -25,6 +28,8 @@ const TeacherCourseViewPage: React.FC = () => {
   const [chapters, setChapters] = useState<any[]>([])
   const [sections, setSections] = useState<Record<number, CourseSection[]>>({})
   const [stats, setStats] = useState<any>(null)
+  const [ragDocs, setRagDocs] = useState<RagDocument[]>([])
+  const [ragUploading, setRagUploading] = useState(false)
 
   useEffect(() => {
     if (!courseId) return
@@ -59,6 +64,43 @@ const TeacherCourseViewPage: React.FC = () => {
     }
     load()
   }, [courseId])
+
+  const loadRagDocs = async () => {
+    try {
+      const docs = await ragService.listDocuments(courseId)
+      setRagDocs(Array.isArray(docs) ? docs : [])
+    } catch {
+      // 忽略权限错误（课程未发布时可能无法访问）
+    }
+  }
+
+  useEffect(() => {
+    if (courseId) loadRagDocs()
+  }, [courseId])
+
+  const handleRagUpload = async (file: File) => {
+    setRagUploading(true)
+    try {
+      await ragService.uploadDocument(courseId, file)
+      message.success(`已上传 ${file.name}，正在向量化...`)
+      await loadRagDocs()
+    } catch (e: any) {
+      message.error(e?.message || '上传失败')
+    } finally {
+      setRagUploading(false)
+    }
+    return false // 阻止 antd Upload 默认行为
+  }
+
+  const handleRagDelete = async (docId: number) => {
+    try {
+      await ragService.deleteDocument(courseId, docId)
+      message.success('已删除')
+      setRagDocs(prev => prev.filter(d => d.id !== docId))
+    } catch (e: any) {
+      message.error(e?.message || '删除失败')
+    }
+  }
 
   if (loading) {
     return (
@@ -226,6 +268,70 @@ const TeacherCourseViewPage: React.FC = () => {
                   )
                 })}
               </Collapse>
+            )}
+          </Card>
+
+          {/* 知识库管理 */}
+          <Card
+            style={{ marginTop: 16 }}
+            title={
+              <Space>
+                <DatabaseOutlined />
+                <span>知识库管理</span>
+                <Badge count={ragDocs.length} color="#1890ff" showZero />
+              </Space>
+            }
+            extra={
+              <Upload
+                accept=".txt,.md"
+                showUploadList={false}
+                beforeUpload={handleRagUpload}
+              >
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  loading={ragUploading}
+                  size="small"
+                >
+                  上传文档
+                </Button>
+              </Upload>
+            }
+          >
+            <div style={{ marginBottom: 8 }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                支持 .txt / .md 格式，上传后自动切块并向量化，供学生在"知识库问答"中使用。
+              </Typography.Text>
+            </div>
+            {ragDocs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: '#999' }}>
+                <DatabaseOutlined style={{ fontSize: 28, marginBottom: 8 }} />
+                <p style={{ margin: 0 }}>暂无文档，请上传课程资料</p>
+              </div>
+            ) : (
+              <Table
+                size="small"
+                dataSource={ragDocs}
+                rowKey="id"
+                pagination={false}
+                columns={[
+                  { title: '文件名', dataIndex: 'filename', ellipsis: true },
+                  { title: 'Chunks', dataIndex: 'chunk_count', width: 70, align: 'center' as const },
+                  { title: '上传时间', dataIndex: 'created_at', width: 110, render: (v: string) => v?.slice(0, 10) },
+                  {
+                    title: '操作', width: 60, align: 'center' as const,
+                    render: (_: any, record: RagDocument) => (
+                      <Popconfirm
+                        title="确认删除该文档及其所有知识块？"
+                        onConfirm={() => handleRagDelete(record.id)}
+                        okText="删除" cancelText="取消"
+                      >
+                        <Button type="link" danger size="small" icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    ),
+                  },
+                ]}
+              />
             )}
           </Card>
         </Col>
