@@ -194,7 +194,7 @@ func DeleteRAGDocument(c *gin.Context) {
 	}
 	docID, err := strconv.ParseInt(c.Param("docId"), 10, 64)
 	if err != nil {
-		utils.BadRequest(c, "无效的文档 ID")
+		utils.BadRequest(c, "无效的文件 ID")
 		return
 	}
 	if !isCourseInstructorOrAdmin(c, courseID) {
