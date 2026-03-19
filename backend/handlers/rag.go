@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/database"
-	otel_rag "github.com/online-education-platform/backend/internal/rag"
-	"github.com/online-education-platform/backend/rag"
+	"github.com/online-education-platform/backend/internal/rag"
+	original_rag "github.com/online-education-platform/backend/rag"
 	"github.com/online-education-platform/backend/utils"
 	"go.uber.org/zap"
 )
@@ -76,7 +76,7 @@ func UploadRAGDocument(c *gin.Context) {
 	text := string(raw)
 	charCount := len([]rune(text))
 
-	chunks := rag.ChunkText(text, 500, 50)
+	chunks := original_rag.ChunkText(text, 500, 50)
 	if len(chunks) == 0 {
 		utils.BadRequest(c, "文件内容为空")
 		return
@@ -85,7 +85,7 @@ func UploadRAGDocument(c *gin.Context) {
 		chunks = chunks[:ragMaxChunks]
 	}
 
-	embedClient := &rag.EmbedClient{
+	embedClient := &original_rag.EmbedClient{
 		APIKey:  os.Getenv("OPENAI_API_KEY"),
 		BaseURL: os.Getenv("OPENAI_BASE_URL"),
 	}
@@ -241,7 +241,7 @@ func QueryRAG(c *gin.Context) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	baseURL := os.Getenv("OPENAI_BASE_URL")
 
-	embedClient := &rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
 	queryEmbeddings, err := embedClient.Embed([]string{req.Question})
 	if err != nil {
 		utils.InternalServerError(c, "问题向量化失败: "+err.Error())
@@ -264,9 +264,9 @@ func QueryRAG(c *gin.Context) {
 	}
 	defer chunkRows.Close()
 
-	var allChunks []rag.Chunk
+	var allChunks []original_rag.Chunk
 	for chunkRows.Next() {
-		var ch rag.Chunk
+		var ch original_rag.Chunk
 		var embStr string
 		if err := chunkRows.Scan(&ch.ID, &ch.DocID, &ch.Content, &embStr); err != nil {
 			continue
@@ -286,7 +286,7 @@ func QueryRAG(c *gin.Context) {
 		return
 	}
 
-	topChunks := rag.TopK(queryVec, allChunks, 5)
+	topChunks := original_rag.TopK(queryVec, allChunks, 5)
 	contexts := make([]string, len(topChunks))
 	sourceIDs := make([]int64, len(topChunks))
 	for i, ch := range topChunks {
@@ -294,7 +294,7 @@ func QueryRAG(c *gin.Context) {
 		sourceIDs[i] = ch.ID
 	}
 
-	genClient := &rag.GenClient{APIKey: apiKey, BaseURL: baseURL}
+	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL}
 	answer, err := genClient.Generate(req.Question, contexts)
 	if err != nil {
 		utils.GetLogger().Error("RAG 生成失败", zap.Error(err))
