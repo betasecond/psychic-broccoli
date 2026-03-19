@@ -110,7 +110,28 @@ func autoMigrate() error {
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id)`)
 
-	// 6. exam_answers 表 - 新增答题耗时字段（PLAN-03）
+	// 6. discussions 表 - 补充社交功能列（views/likes/favorites/heat_score）
+	if err := addColumnIfNotExists("discussions", "views", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "likes", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "favorites", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "heat_score", "REAL NOT NULL DEFAULT 0"); err != nil { return err }
+
+	// 6b. reply_favorites 表
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS reply_favorites (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			reply_id   INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
+			user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(reply_id, user_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 reply_favorites 表失败: %v", err)
+	}
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_favorites_reply_id ON reply_favorites(reply_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_favorites_user_id  ON reply_favorites(user_id)`)
+
+	// 7. exam_answers 表 - 新增答题耗时字段（PLAN-03）
 	if err := addColumnIfNotExists("exam_answers", "time_spent", "INTEGER DEFAULT 0"); err != nil {
 		return err
 	}

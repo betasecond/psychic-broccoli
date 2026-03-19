@@ -162,6 +162,10 @@ CREATE TABLE IF NOT EXISTS discussions (
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     replies INTEGER NOT NULL DEFAULT 0,
+    views INTEGER NOT NULL DEFAULT 0,
+    likes INTEGER NOT NULL DEFAULT 0,
+    favorites INTEGER NOT NULL DEFAULT 0,
+    heat_score REAL NOT NULL DEFAULT 0,
     last_reply_at DATETIME,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'closed')),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -223,6 +227,18 @@ CREATE TABLE IF NOT EXISTS reply_likes (
 
 CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id);
 CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id);
+
+-- 回复收藏表
+CREATE TABLE IF NOT EXISTS reply_favorites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    reply_id    INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(reply_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reply_favorites_reply_id ON reply_favorites(reply_id);
+CREATE INDEX IF NOT EXISTS idx_reply_favorites_user_id  ON reply_favorites(user_id);
 
 -- AI 解析修改记录表（PLAN-05）
 CREATE TABLE IF NOT EXISTS ai_corrections (
