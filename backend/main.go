@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/config"
@@ -9,7 +10,6 @@ import (
 	"github.com/online-education-platform/backend/handlers"
 	otel_internal "github.com/online-education-platform/backend/internal/otel"
 	"github.com/online-education-platform/backend/middleware"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"github.com/online-education-platform/backend/utils"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
