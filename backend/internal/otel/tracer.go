@@ -1,7 +1,6 @@
 package otel
 
 import (
-	"context"
 	"log"
 
 	"go.opentelemetry.io/otel"
