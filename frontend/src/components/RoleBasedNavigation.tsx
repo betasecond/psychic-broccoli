@@ -60,12 +60,6 @@ const RoleBasedNavigation: React.FC = () => {
             onClick: () => handleMenuClick('/student/exams'),
           },
           {
-            key: '/student/live-classes',
-            icon: <VideoCameraOutlined />,
-            label: '直播课堂',
-            onClick: () => handleMenuClick('/student/live-classes'),
-          },
-          {
             key: '/student/schedule',
             icon: <CalendarOutlined />,
             label: '课程表',
@@ -168,12 +162,6 @@ const RoleBasedNavigation: React.FC = () => {
             ],
           },
           {
-            key: '/teacher/live-classes',
-            icon: <VideoCameraOutlined />,
-            label: '直播教学',
-            onClick: () => handleMenuClick('/teacher/live-classes'),
-          },
-          {
             key: '/teacher/discussions',
             icon: <CommentOutlined />,
             label: '讨论管理',
@@ -224,6 +212,12 @@ const RoleBasedNavigation: React.FC = () => {
             icon: <BookOutlined />,
             label: '课程管理',
             onClick: () => handleMenuClick('/admin/courses'),
+          },
+          {
+            key: '/admin/live-management',
+            icon: <VideoCameraOutlined />,
+            label: '直播中心',
+            onClick: () => handleMenuClick('/admin/live-management'),
           },
           {
             key: '/admin/system',

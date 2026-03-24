@@ -205,16 +205,6 @@ function App() {
                 }
               />
               <Route
-                path="/student/live-classes"
-                element={
-                  <ProtectedRoute requiredRole="STUDENT">
-                    <AppLayout>
-                      <LiveClassesPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/student/schedule"
                 element={
                   <ProtectedRoute requiredRole="STUDENT">
@@ -230,16 +220,6 @@ function App() {
                   <ProtectedRoute requiredRole="STUDENT">
                     <AppLayout>
                       <MessagesPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/live/:id"
-                element={
-                  <ProtectedRoute requiredRole="STUDENT">
-                    <AppLayout>
-                      <WatchLivePage />
                     </AppLayout>
                   </ProtectedRoute>
                 }
@@ -447,41 +427,11 @@ function App() {
                 }
               />
               <Route
-                path="/teacher/live-classes"
-                element={
-                  <ProtectedRoute requiredRole="INSTRUCTOR">
-                    <AppLayout>
-                      <TeacherLiveClassesPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/teacher/analytics"
                 element={
                   <ProtectedRoute requiredRole="INSTRUCTOR">
                     <AppLayout>
                       <AnalyticsPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/teacher/live"
-                element={
-                  <ProtectedRoute requiredRole="INSTRUCTOR">
-                    <AppLayout>
-                      <LiveManagementPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/teacher/live/:id"
-                element={
-                  <ProtectedRoute requiredRole="INSTRUCTOR">
-                    <AppLayout>
-                      <LiveStreamPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }
@@ -614,6 +564,26 @@ function App() {
                   <ProtectedRoute requiredRole="ADMIN">
                     <AppLayout>
                       <AdminAnalyticsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/live-management"
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <LiveManagementPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/live/:id"
+                element={
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <AppLayout>
+                      <LiveStreamPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }
