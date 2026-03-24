@@ -15,7 +15,7 @@ export const initFrontendTracer = () => {
   });
 
   const exporter = new OTLPTraceExporter({
-    url: '/api/v1/otel/traces',
+    url: `${window.location.protocol}//${window.location.host}/api/v1/otel/traces`,
   });
 
   provider.addSpanProcessor(new BatchSpanProcessor(exporter));
