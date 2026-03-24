@@ -62,8 +62,13 @@ func (c *GenClient) GenerateWithHistory(question string, contexts []string, hist
 	// 加入当前问题和资料
 	messages = append(messages, chatMessage{Role: "user", Content: sb.String() + "\n【当前问题】\n" + question})
 
+	model := c.Model
+	if model == "" {
+		model = defaultGenModel
+	}
+
 	body, err := json.Marshal(chatRequest{
-		Model:    genModel,
+		Model:    model,
 		Messages: messages,
 	})
 	if err != nil {
