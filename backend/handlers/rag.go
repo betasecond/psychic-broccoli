@@ -215,6 +215,94 @@ func DeleteRAGDocument(c *gin.Context) {
 	utils.Success(c, gin.H{"deleted": true})
 }
 
+// ---- QueryRAGExtended ----
+
+// QueryRAGExtended POST /courses/:id/rag/query
+func QueryRAGExtended(c *gin.Context) {
+	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "无效的课程 ID")
+		return
+	}
+	if !isCourseAccessible(c, courseID) {
+		utils.Forbidden(c, "请先选课")
+		return
+	}
+
+	var req struct {
+		Question  string `json:"question" binding:"required"`
+		SessionID string `json:"session_id"` // 可选，用于多轮对话记忆
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+
+	// 1. 检索上下文 (常规逻辑)
+	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+	queryEmbeddings, _ := embedClient.Embed([]string{req.Question})
+	queryVec := queryEmbeddings[0]
+
+	chunkRows, _ := database.DB.Query(`SELECT id, content, embedding FROM rag_chunks WHERE course_id=?`, courseID)
+	var allChunks []original_rag.Chunk
+	for chunkRows.Next() {
+		var ch original_rag.Chunk
+		var embStr string
+		chunkRows.Scan(&ch.ID, &ch.Content, &embStr)
+		json.Unmarshal([]byte(embStr), &ch.Embedding)
+		allChunks = append(allChunks, ch)
+	}
+	topChunks := original_rag.TopK(queryVec, allChunks, 5)
+	contexts := make([]string, len(topChunks))
+	for i, ch := range topChunks {
+		contexts[i] = ch.Content
+	}
+
+	// 2. 模拟多轮对话记忆 (简单的数据库实现，若无 Redis)
+	userIDVal, _ := c.Get("userID")
+	userID, _ := userIDVal.(int64)
+	
+	history := []original_rag.ChatMessage{}
+	if req.SessionID != "" {
+		// 从数据库 rag_queries 中拉取最近 5 轮该 Session 的对话
+		rows, _ := database.DB.Query(`
+			SELECT question, answer FROM rag_queries 
+			WHERE course_id=? AND user_id=? AND session_id=? 
+			ORDER BY created_at DESC LIMIT 5`, 
+			courseID, userID, req.SessionID,
+		)
+		for rows.Next() {
+			var q, a string
+			rows.Scan(&q, &a)
+			history = append([]original_rag.ChatMessage{
+				{Role: "user", Content: q},
+				{Role: "assistant", Content: a},
+			}, history...)
+		}
+		rows.Close()
+	}
+
+	// 3. 生成回答
+	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL}
+	answer, err := genClient.GenerateWithHistory(req.Question, contexts, history)
+	if err != nil {
+		utils.InternalServerError(c, "生成失败")
+		return
+	}
+
+	// 4. 保存对话记录
+	database.DB.Exec(
+		`INSERT INTO rag_queries(course_id, user_id, session_id, question, answer, created_at)
+		 VALUES(?,?,?,?,?,?)`,
+		courseID, userID, req.SessionID, req.Question, answer, time.Now(),
+	)
+
+	utils.Success(c, gin.H{"answer": answer})
+}
+
 // ---- QueryRAG ----
 
 // QueryRAG POST /courses/:id/rag/query

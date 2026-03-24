@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Input, List, Avatar, message as antMessage } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
+import { MarkdownRenderer } from './index'
 import { liveService } from '@/services'
 import type { LiveMessage } from '@/services/liveService'
 import './LiveChat.css'
@@ -132,7 +133,11 @@ export const LiveChat: React.FC<LiveChatProps> = ({ liveId, isInstructor = false
                     </span>
                   </div>
                 }
-                description={<div className="message-content">{msg.content}</div>}
+                description={
+                  <div className="message-content">
+                    <MarkdownRenderer content={msg.content} />
+                  </div>
+                }
               />
             </List.Item>
           )}

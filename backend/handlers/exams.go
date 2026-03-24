@@ -40,6 +40,14 @@ type SubmitExamRequest struct {
 	} `json:"answers"`
 }
 
+// SaveDraftRequest 保存草稿请求
+type SaveDraftRequest struct {
+	Answers []struct {
+		QuestionID int64  `json:"questionId"`
+		Answer     string `json:"answer"` // JSON字符串
+	} `json:"answers"`
+}
+
 // GetExams 获取考试列表
 func GetExams(c *gin.Context) {
 	courseID := c.Query("courseId")
@@ -472,6 +480,104 @@ func SubmitExam(c *gin.Context) {
 		"submissionId": submissionID,
 		"totalScore":   totalScore,
 	})
+}
+
+// SaveDraft 保存答卷草稿
+func SaveDraft(c *gin.Context) {
+	examID := c.Param("id")
+	userID, _ := c.Get("userID")
+
+	var req SaveDraftRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "请求参数错误")
+		return
+	}
+
+	// 检查考试是否存在
+	var count int
+	err := database.DB.QueryRow("SELECT COUNT(*) FROM exams WHERE id = ?", examID).Scan(&count)
+	if err != nil || count == 0 {
+		utils.NotFound(c, "考试不存在")
+		return
+	}
+
+	// 检查是否已提交正卷（已提交则不允许修改草稿）
+	var submissionID int64
+	err = database.DB.QueryRow(`
+		SELECT id FROM exam_submissions 
+		WHERE exam_id = ? AND student_id = ?
+	`, examID, userID).Scan(&submissionID)
+	if err == nil {
+		utils.BadRequest(c, "正式答卷已提交，无法保存草稿")
+		return
+	}
+
+	// 保存或更新草稿
+	// 此处使用 upsert 逻辑或先删后增，为了简单和性能，我们存入一个专门的表 exam_drafts
+	// 这里假设数据库中存在 exam_drafts 表，包含 exam_id, student_id, question_id, answer
+	tx, err := database.DB.Begin()
+	if err != nil {
+		utils.InternalServerError(c, "开启事务失败")
+		return
+	}
+
+	// 清理旧草稿
+	_, err = tx.Exec("DELETE FROM exam_drafts WHERE exam_id = ? AND student_id = ?", examID, userID)
+	if err != nil {
+		tx.Rollback()
+		utils.InternalServerError(c, "清理旧草稿失败")
+		return
+	}
+
+	// 批量插入新草稿
+	for _, ans := range req.Answers {
+		_, err = tx.Exec(`
+			INSERT INTO exam_drafts (exam_id, student_id, question_id, answer)
+			VALUES (?, ?, ?, ?)
+		`, examID, userID, ans.QuestionID, ans.Answer)
+		if err != nil {
+			tx.Rollback()
+			utils.InternalServerError(c, "保存草稿失败")
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.InternalServerError(c, "提交事务失败")
+		return
+	}
+
+	utils.Success(c, gin.H{"message": "草稿已保存"})
+}
+
+// GetDraft 获取答卷草稿
+func GetDraft(c *gin.Context) {
+	examID := c.Param("id")
+	userID, _ := c.Get("userID")
+
+	rows, err := database.DB.Query(`
+		SELECT question_id, answer FROM exam_drafts 
+		WHERE exam_id = ? AND student_id = ?
+	`, examID, userID)
+	if err != nil {
+		utils.InternalServerError(c, "查询草稿失败")
+		return
+	}
+	defer rows.Close()
+
+	drafts := []gin.H{}
+	for rows.Next() {
+		var qID int64
+		var ans string
+		if err := rows.Scan(&qID, &ans); err == nil {
+			drafts = append(drafts, gin.H{
+				"questionId": qID,
+				"answer":     ans,
+			})
+		}
+	}
+
+	utils.Success(c, gin.H{"answers": drafts})
 }
 
 // GetExamResults 获取考试成绩列表

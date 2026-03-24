@@ -38,8 +38,56 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-const systemPrompt = `你是课程助教，请严格根据下方提供的参考资料回答学生问题。
+const systemPrompt = `你是课程助教，请严格根据下方提供的参考资料和历史对话语境回答学生问题。
 如果参考资料中没有足够信息，直接说"根据现有资料无法回答该问题"，不要编造内容。`
+
+// GenerateWithHistory 带历史对话记录的生成
+func (c *GenClient) GenerateWithHistory(question string, contexts []string, history []chatMessage) (string, error) {
+	base := c.BaseURL
+	if base == "" {
+		base = defaultGenBaseURL
+	}
+
+	var sb strings.Builder
+	sb.WriteString("【参考资料】\n")
+	for i, ctx := range contexts {
+		fmt.Fprintf(&sb, "[%d] %s\n\n", i+1, ctx)
+	}
+
+	messages := []chatMessage{
+		{Role: "system", Content: systemPrompt},
+	}
+	// 加入历史记录
+	messages = append(messages, history...)
+	// 加入当前问题和资料
+	messages = append(messages, chatMessage{Role: "user", Content: sb.String() + "\n【当前问题】\n" + question})
+
+	body, err := json.Marshal(chatRequest{
+		Model:    genModel,
+		Messages: messages,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, base+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer " + c.APIKey)
+
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+
+	var res chatResponse
+	json.NewDecoder(resp.Body).Decode(&res)
+	
+	if len(res.Choices) == 0 {
+		return "", fmt.Errorf("生成失败")
+	}
+	return res.Choices[0].Message.Content, nil
+}
 
 // Generate 根据 question 和检索到的 contexts 生成答案
 func (c *GenClient) Generate(question string, contexts []string) (string, error) {

@@ -210,6 +210,8 @@ func main() {
 			exams.PUT("/:id/questions/:qid", handlers.UpdateQuestion)
 			exams.DELETE("/:id/questions/:qid", handlers.DeleteQuestion)
 			exams.POST("/:id/submit", handlers.SubmitExam)
+			exams.POST("/:id/draft", handlers.SaveDraft)    // 新增：保存草稿
+			exams.GET("/:id/draft", handlers.GetDraft)      // 新增：获取草稿
 			exams.GET("/:id/results", handlers.GetExamResults)
 			exams.GET("/submissions/:id", handlers.GetExamSubmissionDetail)
 			exams.POST("/:id/parse-questions", handlers.ParseQuestionsWithAI)

@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, Row, Col, Button, Typography, Space, Radio, Checkbox, Input, message, Spin, Modal, Statistic } from 'antd';
 import { 
   ClockCircleOutlined,
   CheckCircleOutlined,
   ArrowLeftOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  SaveOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import { useAppDispatch, useAppSelector, selectCurrentExam, selectExamQuestions, selectExamLoading } from '../../store';
 import { fetchExam, submitExam, clearCurrentExam } from '../../store/slices/examSlice';
 import { trace } from '@opentelemetry/api';
@@ -23,23 +25,68 @@ const TakeExamPage: React.FC = () => {
   const questions = useAppSelector(selectExamQuestions);
   const loading = useAppSelector(selectExamLoading);
   
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, string>>(() => {
+    // 优先从本地恢复草稿
+    if (id) {
+      const localDraft = localStorage.getItem(`exam_draft_${id}`);
+      return localDraft ? JSON.parse(localDraft) : {};
+    }
+    return {};
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   useEffect(() => {
     if (id) {
       dispatch(fetchExam(Number(id)));
+      // 从后端恢复草稿
+      axios.get(`/api/v1/exams/${id}/draft`).then(res => {
+        if (res.data.answers && res.data.answers.length > 0) {
+          const remoteAnswers: Record<number, string> = {};
+          res.data.answers.forEach((item: any) => {
+            remoteAnswers[item.questionId] = item.answer;
+          });
+          setAnswers(prev => ({ ...remoteAnswers, ...prev })); // 本地覆盖远程，如有冲突以本地为准（防断网后恢复）
+        }
+      }).catch(() => {});
     }
     return () => {
       dispatch(clearCurrentExam());
     };
   }, [id, dispatch]);
 
-  const handleAnswerChange = (questionId: number, answer: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
+  // 定时器：每 60 秒同步给后端
+  useEffect(() => {
+    if (!id) return;
+    const timer = setInterval(() => {
+      saveDraftToBackend();
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [id]);
+
+  const saveDraftToBackend = async () => {
+    if (!id) return;
+    const answerList = Object.entries(answersRef.current).map(([questionId, answer]) => ({
+      questionId: Number(questionId),
+      answer: answer,
     }));
+    if (answerList.length === 0) return;
+
+    try {
+      await axios.post(`/api/v1/exams/${id}/draft`, { answers: answerList });
+    } catch (e) {
+      console.error('自动保存失败', e);
+    }
+  };
+
+  const handleAnswerChange = (questionId: number, answer: string) => {
+    setAnswers(prev => {
+      const newAnswers = { ...prev, [questionId]: answer };
+      localStorage.setItem(`exam_draft_${id}`, JSON.stringify(newAnswers));
+      return newAnswers;
+    });
   };
 
   const handleSubmit = () => {
@@ -79,6 +126,7 @@ const TakeExamPage: React.FC = () => {
       })).unwrap();
       
       message.success('考试提交成功！');
+      localStorage.removeItem(`exam_draft_${id}`);
       navigate(`/student/exams/${id}`);
       span.addEvent('submission_response_received');
     } catch (error: any) {
@@ -88,6 +136,13 @@ const TakeExamPage: React.FC = () => {
       setSubmitting(false);
       span.end();
     }
+  };
+
+  const manualSave = async () => {
+    setSaving(true);
+    await saveDraftToBackend();
+    setSaving(false);
+    message.success('草稿保存成功');
   };
 
   if (loading && !exam) {
@@ -189,12 +244,19 @@ const TakeExamPage: React.FC = () => {
           onClick={() => {
             Modal.confirm({
               title: '确认退出',
-              content: '退出后答题记录将不会保存，确定要退出吗？',
+              content: '退出考试前，建议先保存草稿。确定要退出吗？',
               onOk: () => navigate(`/student/exams/${id}`),
             });
           }}
         >
-          退出考试
+          退出
+        </Button>
+        <Button 
+          icon={<SaveOutlined />} 
+          onClick={manualSave}
+          loading={saving}
+        >
+          保存草稿
         </Button>
       </Space>
 
@@ -283,4 +345,3 @@ const TakeExamPage: React.FC = () => {
 };
 
 export default TakeExamPage;
-

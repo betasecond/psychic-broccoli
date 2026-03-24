@@ -22,6 +22,7 @@ import {
   LikeFilled,
 } from '@ant-design/icons'
 import { discussionService } from '@/services'
+import { MarkdownRenderer } from '@/components'
 import type { DiscussionDetail, DiscussionReply } from '@/services/discussionService'
 import { useAppSelector } from '@/store'
 import './DiscussionDetailPage.css'
@@ -227,7 +228,7 @@ const DiscussionDetailPage: React.FC = () => {
 
         {discussion.content && (
           <div className="discussion-content">
-            <p>{discussion.content}</p>
+            <MarkdownRenderer content={discussion.content} />
           </div>
         )}
       </Card>
@@ -265,7 +266,11 @@ const DiscussionDetailPage: React.FC = () => {
                     </span>
                   </div>
                 }
-                description={<div className="reply-content">{reply.content}</div>}
+                description={
+                  <div className="reply-content">
+                    <MarkdownRenderer content={reply.content} />
+                  </div>
+                }
               />
             </List.Item>
           )}
