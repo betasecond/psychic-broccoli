@@ -17,9 +17,10 @@ import {
   RobotOutlined,
   HistoryOutlined,
   DatabaseOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { courseService, type CourseSection } from '../../services/courseService';
+import { courseService, type CourseSection, type CourseMaterial } from '../../services/courseService';
 import { progressService } from '../../services/progressService';
 import ragService, { type RagQueryHistory } from '../../services/ragService';
 
@@ -45,6 +46,8 @@ const CourseDetailPage: React.FC = () => {
   const [completedChapters, setCompletedChapters] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<CourseSection | null>(null);
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
 
   // RAG 状态
   const [qaList, setQaList] = useState<QAItem[]>([]);
@@ -89,12 +92,27 @@ const CourseDetailPage: React.FC = () => {
           setProgress(myCourse.progress || 0);
           setCompletedChapters(new Set(myCourse.completedChapterIds || []));
         }
+
+        // 获取课程资料
+        fetchMaterials();
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, [id]);
+
+  const fetchMaterials = async () => {
+    setMaterialsLoading(true);
+    try {
+      const data = await courseService.getMaterials(courseId);
+      setMaterials(data.materials || []);
+    } catch (e) {
+      console.error('加载资料失败', e);
+    } finally {
+      setMaterialsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (chatBottomRef.current) {
@@ -474,6 +492,42 @@ const CourseDetailPage: React.FC = () => {
                       </Space>
                     ),
                     children: ragTab,
+                  },
+                  {
+                    key: 'materials',
+                    label: (
+                      <Space>
+                        <CloudDownloadOutlined />
+                        资料下载
+                      </Space>
+                    ),
+                    children: (
+                      <List
+                        loading={materialsLoading}
+                        dataSource={materials}
+                        renderItem={item => (
+                          <List.Item
+                            actions={[
+                              <Button 
+                                type="link" 
+                                icon={<CloudDownloadOutlined />}
+                                href={item.url.startsWith('http') ? item.url : `${window.location.origin}${item.url}`}
+                                target="_blank"
+                              >
+                                下载
+                              </Button>
+                            ]}
+                          >
+                            <List.Item.Meta
+                              avatar={<FileTextOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
+                              title={item.name}
+                              description={`上传于: ${new Date(item.createdAt).toLocaleDateString()} · 大小: ${(item.size / 1024).toFixed(1)} KB`}
+                            />
+                          </List.Item>
+                        )}
+                        locale={{ emptyText: <Empty description="暂无相关学习资料" /> }}
+                      />
+                    ),
                   },
                 ]}
               />

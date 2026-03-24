@@ -43,8 +43,11 @@ const ragService = {
   },
 
   // 提问
-  query(courseId: number, question: string): Promise<RagQueryResult> {
-    return api.post(`/courses/${courseId}/rag/query`, { question })
+  query(courseId: number, question: string, sessionId?: string): Promise<RagQueryResult> {
+    return api.post(`/courses/${courseId}/rag/query`, { 
+      question,
+      session_id: sessionId || `session_${courseId}` // 默认按课程隔离会话
+    })
   },
 
   // 查询历史
