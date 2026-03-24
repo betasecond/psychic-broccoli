@@ -9,13 +9,14 @@ import (
 	"strings"
 )
 
-const defaultGenBaseURL = "https://api.openai.com/v1"
-const genModel = "gpt-4o-mini"
+const defaultGenBaseURL = "https://openrouter.ai/api/v1"
+const defaultGenModel = "google/gemini-2.5-flash-preview"
 
-// GenClient 调用 OpenAI Chat Completion API 生成答案
+// GenClient 调用 OpenRouter Chat Completion API 生成答案
 type GenClient struct {
 	APIKey  string
-	BaseURL string // 默认 https://api.openai.com/v1，可指向国内代理
+	BaseURL string // 默认 https://openrouter.ai/api/v1
+	Model   string // 默认 google/gemini-2.5-flash-preview，可通过 LLM_MODEL 环境变量覆盖
 }
 
 type chatMessage struct {
@@ -46,6 +47,10 @@ func (c *GenClient) Generate(question string, contexts []string) (string, error)
 	if base == "" {
 		base = defaultGenBaseURL
 	}
+	model := c.Model
+	if model == "" {
+		model = defaultGenModel
+	}
 
 	var sb strings.Builder
 	sb.WriteString("【参考资料】\n")
@@ -56,7 +61,7 @@ func (c *GenClient) Generate(question string, contexts []string) (string, error)
 	sb.WriteString(question)
 
 	body, err := json.Marshal(chatRequest{
-		Model: genModel,
+		Model: model,
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: sb.String()},
@@ -72,6 +77,8 @@ func (c *GenClient) Generate(question string, contexts []string) (string, error)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("HTTP-Referer", "https://github.com/betasecond/psychic-broccoli")
+	req.Header.Set("X-Title", "CourseArk")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

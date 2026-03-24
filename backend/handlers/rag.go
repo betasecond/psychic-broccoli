@@ -293,7 +293,7 @@ func QueryRAG(c *gin.Context) {
 		sourceIDs[i] = ch.ID
 	}
 
-	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL}
+	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL, Model: os.Getenv("LLM_MODEL")}
 	answer, err := genClient.Generate(req.Question, contexts)
 	if err != nil {
 		utils.GetLogger().Error("RAG 生成失败", zap.Error(err))

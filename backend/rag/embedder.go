@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-const defaultEmbedBaseURL = "https://api.openai.com/v1"
-const embedModel = "text-embedding-3-small"
+const defaultEmbedBaseURL = "https://openrouter.ai/api/v1"
+const embedModel = "openai/text-embedding-3-small"
 
 // EmbedClient 调用 OpenAI Embedding API
 type EmbedClient struct {
@@ -57,6 +57,8 @@ func (c *EmbedClient) Embed(texts []string) ([][]float32, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("HTTP-Referer", "https://github.com/betasecond/psychic-broccoli")
+	req.Header.Set("X-Title", "CourseArk")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
