@@ -85,8 +85,8 @@ func UploadRAGDocument(c *gin.Context) {
 	}
 
 	embedClient := &original_rag.EmbedClient{
-		APIKey:  os.Getenv("OPENAI_API_KEY"),
-		BaseURL: os.Getenv("OPENAI_BASE_URL"),
+		APIKey:  utils.GetEnv("OPENAI_API_KEY", "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"),
+		BaseURL: utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
 	}
 	embeddings, err := embedClient.Embed(chunks)
 	if err != nil {
@@ -238,8 +238,8 @@ func QueryRAGExtended(c *gin.Context) {
 		return
 	}
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	baseURL := os.Getenv("OPENAI_BASE_URL")
+	apiKey := utils.GetEnv("OPENAI_API_KEY", "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")
+	baseURL := utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
 
 	// 1. 检索上下文 (常规逻辑)
 	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
@@ -325,8 +325,8 @@ func QueryRAG(c *gin.Context) {
 		return
 	}
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	baseURL := os.Getenv("OPENAI_BASE_URL")
+	apiKey := utils.GetEnv("OPENAI_API_KEY", "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")
+	baseURL := utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
 
 	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
 	queryEmbeddings, err := embedClient.Embed([]string{req.Question})
@@ -381,7 +381,11 @@ func QueryRAG(c *gin.Context) {
 		sourceIDs[i] = ch.ID
 	}
 
-	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL, Model: os.Getenv("LLM_MODEL")}
+	genClient := &original_rag.GenClient{
+		APIKey:  apiKey,
+		BaseURL: baseURL,
+		Model:   utils.GetEnv("LLM_MODEL", "google/gemini-2.5-flash-preview"),
+	}
 	answer, err := genClient.Generate(req.Question, contexts)
 	if err != nil {
 		utils.GetLogger().Error("RAG 生成失败", zap.Error(err))
