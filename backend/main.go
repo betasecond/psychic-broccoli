@@ -165,7 +165,7 @@ func main() {
 				authenticated.POST("/:id/rag/documents", handlers.UploadRAGDocument)
 				authenticated.GET("/:id/rag/documents", handlers.ListRAGDocuments)
 				authenticated.DELETE("/:id/rag/documents/:docId", handlers.DeleteRAGDocument)
-				authenticated.POST("/:id/rag/query", handlers.QueryRAG)
+				authenticated.POST("/:id/rag/query", handlers.QueryRAGExtended) // 切换到增强版 RAG
 				authenticated.GET("/:id/rag/queries", handlers.GetRAGQueryHistory)
 			}
 		}

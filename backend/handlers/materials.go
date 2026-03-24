@@ -18,7 +18,7 @@ func GetCourseMaterials(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	role, _ := c.Get("role")
 
-	// 教师只能查看自己课程的资料
+	// 权限检查
 	if role == "INSTRUCTOR" {
 		var instructorID int64
 		if err := database.DB.QueryRow(`SELECT instructor_id FROM courses WHERE id = ?`, courseID).Scan(&instructorID); err != nil {
@@ -29,6 +29,17 @@ func GetCourseMaterials(c *gin.Context) {
 			utils.Forbidden(c, "权限不足")
 			return
 		}
+	} else if role == "STUDENT" {
+		// 学生必须选修了该课程才能看到资料
+		var count int
+		database.DB.QueryRow(`SELECT COUNT(*) FROM course_enrollments WHERE course_id = ? AND student_id = ?`, courseID, userID).Scan(&count)
+		if count == 0 {
+			utils.Forbidden(c, "必须先加入课程才能查看资料")
+			return
+		}
+	} else if role != "ADMIN" {
+		utils.Forbidden(c, "未授权的角色")
+		return
 	}
 
 	rows, err := database.DB.Query(`
