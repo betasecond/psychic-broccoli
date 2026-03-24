@@ -12,6 +12,12 @@ import (
 const defaultGenBaseURL = "https://openrouter.ai/api/v1"
 const defaultGenModel = "google/gemini-2.5-flash-preview"
 
+// ChatMessage 导出消息结构体以供 handlers 使用
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // GenClient 调用 OpenRouter Chat Completion API 生成答案
 type GenClient struct {
 	APIKey  string
@@ -19,19 +25,14 @@ type GenClient struct {
 	Model   string // 默认 google/gemini-2.5-flash-preview，可通过 LLM_MODEL 环境变量覆盖
 }
 
-type chatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 type chatRequest struct {
 	Model    string        `json:"model"`
-	Messages []chatMessage `json:"messages"`
+	Messages []ChatMessage `json:"messages"`
 }
 
 type chatResponse struct {
 	Choices []struct {
-		Message chatMessage `json:"message"`
+		Message ChatMessage `json:"message"`
 	} `json:"choices"`
 	Error *struct {
 		Message string `json:"message"`
@@ -42,7 +43,7 @@ const systemPrompt = `你是课程助教，请严格根据下方提供的参考�
 如果参考资料中没有足够信息，直接说"根据现有资料无法回答该问题"，不要编造内容。`
 
 // GenerateWithHistory 带历史对话记录的生成
-func (c *GenClient) GenerateWithHistory(question string, contexts []string, history []chatMessage) (string, error) {
+func (c *GenClient) GenerateWithHistory(question string, contexts []string, history []ChatMessage) (string, error) {
 	base := c.BaseURL
 	if base == "" {
 		base = defaultGenBaseURL
@@ -54,13 +55,13 @@ func (c *GenClient) GenerateWithHistory(question string, contexts []string, hist
 		fmt.Fprintf(&sb, "[%d] %s\n\n", i+1, ctx)
 	}
 
-	messages := []chatMessage{
+	messages := []ChatMessage{
 		{Role: "system", Content: systemPrompt},
 	}
 	// 加入历史记录
 	messages = append(messages, history...)
 	// 加入当前问题和资料
-	messages = append(messages, chatMessage{Role: "user", Content: sb.String() + "\n【当前问题】\n" + question})
+	messages = append(messages, ChatMessage{Role: "user", Content: sb.String() + "\n【当前问题】\n" + question})
 
 	model := c.Model
 	if model == "" {
@@ -115,7 +116,7 @@ func (c *GenClient) Generate(question string, contexts []string) (string, error)
 
 	body, err := json.Marshal(chatRequest{
 		Model: model,
-		Messages: []chatMessage{
+		Messages: []ChatMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: sb.String()},
 		},
