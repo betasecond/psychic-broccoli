@@ -283,7 +283,7 @@ const TeacherCourseViewPage: React.FC = () => {
             }
             extra={
               <Upload
-                accept=".txt,.md"
+                accept=".txt,.md,.docx"
                 showUploadList={false}
                 beforeUpload={handleRagUpload}
               >

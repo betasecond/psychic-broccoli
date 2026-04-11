@@ -22,7 +22,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { courseService, type CourseSection, type CourseMaterial } from '../../services/courseService';
 import { progressService } from '../../services/progressService';
-import ragService, { type RagQueryHistory } from '../../services/ragService';
+import ragService, { type RagQueryHistory, type RagSource } from '../../services/ragService';
 
 const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -31,7 +31,7 @@ const { TextArea } = Input;
 interface QAItem {
   question: string;
   answer: string;
-  sources: string[];
+  sources: RagSource[];
   loading?: boolean;
 }
 
@@ -49,7 +49,7 @@ const CourseDetailPage: React.FC = () => {
   const [materials, setMaterials] = useState<CourseMaterial[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
 
-  // RAG 状态
+  // RAG 鐘舵€?
   const [qaList, setQaList] = useState<QAItem[]>([]);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
@@ -93,7 +93,7 @@ const CourseDetailPage: React.FC = () => {
           setCompletedChapters(new Set(myCourse.completedChapterIds || []));
         }
 
-        // 获取课程资料
+        // 鑾峰彇璇剧▼璧勬枡
         fetchMaterials();
       } finally {
         setLoading(false);
@@ -108,7 +108,7 @@ const CourseDetailPage: React.FC = () => {
       const data = await courseService.getMaterials(courseId);
       setMaterials(data.materials || []);
     } catch (e) {
-      console.error('加载资料失败', e);
+      console.error('鍔犺浇璧勬枡澶辫触', e);
     } finally {
       setMaterialsLoading(false);
     }
@@ -126,7 +126,7 @@ const CourseDetailPage: React.FC = () => {
       const data = await ragService.getHistory(courseId);
       setHistory(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      message.error(e?.message || '加载历史失败');
+      message.error(e?.message || '鍔犺浇鍘嗗彶澶辫触');
     } finally {
       setHistoryLoading(false);
     }
@@ -135,15 +135,17 @@ const CourseDetailPage: React.FC = () => {
   const handleAsk = async () => {
     const q = question.trim();
     if (!q) return;
+
     setQuestion('');
     const placeholder: QAItem = { question: q, answer: '', sources: [], loading: true };
     setQaList(prev => [...prev, placeholder]);
     setAsking(true);
+
     try {
       const result = await ragService.query(courseId, q);
       setQaList(prev => [
         ...prev.slice(0, -1),
-        { question: q, answer: result.answer, sources: result.sources, loading: false },
+        { question: q, answer: result.answer, sources: result.sources || [], loading: false },
       ]);
     } catch (e: any) {
       setQaList(prev => [
@@ -159,11 +161,11 @@ const CourseDetailPage: React.FC = () => {
     setSubmitting(chapterId);
     try {
       const result = await progressService.completeChapter(chapterId);
-      message.success(`章节已完成！课程进度: ${result.progress}%`);
+      message.success(`绔犺妭宸插畬鎴愶紒璇剧▼杩涘害: ${result.progress}%`);
       setProgress(result.progress);
       setCompletedChapters(prev => new Set([...prev, chapterId]));
     } catch (error: any) {
-      message.error(error?.message || '标记失败，请重试');
+      message.error(error?.message || '鏍囪澶辫触锛岃閲嶈瘯');
     } finally {
       setSubmitting(null);
     }
@@ -172,7 +174,7 @@ const CourseDetailPage: React.FC = () => {
   if (loading) {
     return (
       <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <Spin size="large" tip="加载中..." />
+        <Spin size="large" tip="鍔犺浇涓?.." />
       </div>
     );
   }
@@ -180,20 +182,20 @@ const CourseDetailPage: React.FC = () => {
   if (!course) {
     return (
       <div style={{ padding: '24px' }}>
-        <Card><Text>课程不存在</Text></Card>
+        <Card><Text>璇剧▼涓嶅瓨鍦?/Text></Card>
       </div>
     );
   }
 
   const sectionTypeTag = (type: string) =>
     type === 'VIDEO'
-      ? <Tag icon={<PlayCircleOutlined />} color="blue" style={{ marginRight: 0 }}>视频</Tag>
-      : <Tag icon={<FileTextOutlined />} color="green" style={{ marginRight: 0 }}>图文</Tag>;
+      ? <Tag icon={<PlayCircleOutlined />} color="blue" style={{ marginRight: 0 }}>瑙嗛</Tag>
+      : <Tag icon={<FileTextOutlined />} color="green" style={{ marginRight: 0 }}>鍥炬枃</Tag>;
 
-  // ── 知识库问答 Tab ──
+  // 鈹€鈹€ 鐭ヨ瘑搴撻棶绛?Tab 鈹€鈹€
   const ragTab = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '560px' }}>
-      {/* 对话区 */}
+      {/* 瀵硅瘽鍖?*/}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0', marginBottom: 12 }}>
         {qaList.length === 0 && (
           <Empty
@@ -201,7 +203,7 @@ const CourseDetailPage: React.FC = () => {
             imageStyle={{ height: 56 }}
             description={
               <Text type="secondary">
-                在下方输入问题，AI 将根据课程知识库为你解答
+                鍦ㄤ笅鏂硅緭鍏ラ棶棰橈紝AI 灏嗘牴鎹绋嬬煡璇嗗簱涓轰綘瑙ｇ瓟
               </Text>
             }
             style={{ marginTop: 60 }}
@@ -209,7 +211,7 @@ const CourseDetailPage: React.FC = () => {
         )}
         {qaList.map((item, idx) => (
           <div key={idx} style={{ marginBottom: 16 }}>
-            {/* 问题 */}
+            {/* 闂 */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
               <div style={{
                 background: '#1890ff', color: '#fff', padding: '8px 14px',
@@ -218,7 +220,7 @@ const CourseDetailPage: React.FC = () => {
                 {item.question}
               </div>
             </div>
-            {/* 回答 */}
+            {/* 鍥炵瓟 */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <RobotOutlined style={{ fontSize: 20, color: '#1890ff', marginTop: 6, flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
@@ -234,11 +236,17 @@ const CourseDetailPage: React.FC = () => {
                 )}
                 {!item.loading && item.sources.length > 0 && (
                   <div style={{ marginTop: 6 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>参考片段：</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>鍙傝€冪墖娈碉細</Text>
                     {item.sources.map((src, i) => (
-                      <Tooltip key={i} title={src} overlayStyle={{ maxWidth: 400 }}>
+                      <Tooltip
+                        key={i}
+                        title={`${src.filename} #${src.chunkIndex + 1}
+
+${src.content}`}
+                        overlayStyle={{ maxWidth: 400 }}
+                      >
                         <Tag style={{ cursor: 'pointer', marginTop: 4, fontSize: 11 }}>
-                          [{i + 1}] {src.slice(0, 30)}{src.length > 30 ? '…' : ''}
+                          [{i + 1}] {src.filename} · #{src.chunkIndex + 1}
                         </Tag>
                       </Tooltip>
                     ))}
@@ -251,13 +259,13 @@ const CourseDetailPage: React.FC = () => {
         <div ref={chatBottomRef} />
       </div>
 
-      {/* 输入区 */}
+      {/* 杈撳叆鍖?*/}
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
         <Space.Compact style={{ width: '100%' }}>
           <TextArea
             value={question}
             onChange={e => setQuestion(e.target.value)}
-            placeholder="输入问题，按 Ctrl+Enter 发送"
+            placeholder="杈撳叆闂锛屾寜 Ctrl+Enter 鍙戦€?
             autoSize={{ minRows: 2, maxRows: 4 }}
             onKeyDown={e => {
               if (e.key === 'Enter' && e.ctrlKey) {
@@ -276,11 +284,11 @@ const CourseDetailPage: React.FC = () => {
             disabled={!question.trim()}
             style={{ height: 'auto', alignSelf: 'flex-end' }}
           >
-            发送
+            鍙戦€?
           </Button>
         </Space.Compact>
 
-        {/* 历史记录 */}
+        {/* 鍘嗗彶璁板綍 */}
         <div style={{ marginTop: 8 }}>
           <Button
             size="small"
@@ -290,7 +298,7 @@ const CourseDetailPage: React.FC = () => {
             loading={historyLoading}
             style={{ padding: 0 }}
           >
-            查看历史记录
+            鏌ョ湅鍘嗗彶璁板綍
           </Button>
           {history.length > 0 && (
             <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' }}>
@@ -304,7 +312,7 @@ const CourseDetailPage: React.FC = () => {
                     onClick={() => setQaList(prev => [...prev, {
                       question: h.question,
                       answer: h.answer,
-                      sources: [],
+                      sources: h.sources || [],
                     }])}
                   >
                     <List.Item.Meta
@@ -329,49 +337,49 @@ const CourseDetailPage: React.FC = () => {
     <div style={{ padding: '24px' }}>
       <Space style={{ marginBottom: '24px' }}>
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/student/courses')}>
-          返回课程列表
+          杩斿洖璇剧▼鍒楄〃
         </Button>
       </Space>
 
       <Row gutter={[16, 16]}>
-        {/* ── 左栏：课程详情 + Tabs ── */}
+        {/* 鈹€鈹€ 宸︽爮锛氳绋嬭鎯?+ Tabs 鈹€鈹€ */}
         <Col xs={24} lg={16}>
           <Card>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              {/* 课程标题 */}
+              {/* 璇剧▼鏍囬 */}
               <div>
                 <Space>
                   <BookOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
                   <Title level={2} style={{ margin: 0 }}>{course.title}</Title>
                 </Space>
                 <div style={{ marginTop: '12px' }}>
-                  <Text type="secondary">授课教师：</Text>
+                  <Text type="secondary">鎺堣鏁欏笀锛?/Text>
                   <Text strong>{course.instructorName}</Text>
                 </div>
               </div>
 
-              {/* 课程简介 */}
+              {/* 璇剧▼绠€浠?*/}
               <div>
-                <Title level={4}>课程简介</Title>
-                <Paragraph>{course.description || '暂无课程描述'}</Paragraph>
+                <Title level={4}>璇剧▼绠€浠?/Title>
+                <Paragraph>{course.description || '鏆傛棤璇剧▼鎻忚堪'}</Paragraph>
               </div>
 
-              {/* 学习进度 */}
+              {/* 瀛︿範杩涘害 */}
               <div>
-                <Title level={4}>学习进度</Title>
+                <Title level={4}>瀛︿範杩涘害</Title>
                 <Progress
                   percent={progress}
                   status={progress === 100 ? 'success' : 'active'}
                   strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
                 />
                 <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
-                  已完成 {completedChapters.size} / {chapters.length} 章节
+                  宸插畬鎴?{completedChapters.size} / {chapters.length} 绔犺妭
                 </Text>
               </div>
 
               <Divider style={{ margin: '0' }} />
 
-              {/* Tabs: 课程章节 / 知识库问答 */}
+              {/* Tabs: 璇剧▼绔犺妭 / 鐭ヨ瘑搴撻棶绛?*/}
               <Tabs
                 activeKey={activeTab}
                 onChange={setActiveTab}
@@ -381,7 +389,7 @@ const CourseDetailPage: React.FC = () => {
                     label: (
                       <Space>
                         <FolderOpenOutlined />
-                        课程章节
+                        璇剧▼绔犺妭
                       </Space>
                     ),
                     children: (
@@ -402,11 +410,11 @@ const CourseDetailPage: React.FC = () => {
                                       {isCompleted
                                         ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
                                         : <FolderOpenOutlined style={{ color: '#1890ff' }} />}
-                                      <Text strong>第 {chapter.orderIndex} 章</Text>
+                                      <Text strong>绗?{chapter.orderIndex} 绔?/Text>
                                       <Text>{chapter.title}</Text>
-                                      {isCompleted && <Tag color="green">已完成</Tag>}
+                                      {isCompleted && <Tag color="green">宸插畬鎴?/Tag>}
                                       {chSections.length > 0 && (
-                                        <Tag color="default">{chSections.length} 课时</Tag>
+                                        <Tag color="default">{chSections.length} 璇炬椂</Tag>
                                       )}
                                     </Space>
                                   }
@@ -420,13 +428,13 @@ const CourseDetailPage: React.FC = () => {
                                         onClick={() => handleCompleteChapter(chapter.id)}
                                         disabled={isCompleted}
                                       >
-                                        {isCompleted ? '已完成' : '标记完成'}
+                                        {isCompleted ? '宸插畬鎴? : '鏍囪瀹屾垚'}
                                       </Button>
                                     </span>
                                   }
                                 >
                                   {chSections.length === 0 ? (
-                                    <Text type="secondary" style={{ paddingLeft: 8 }}>本章节暂无课时</Text>
+                                    <Text type="secondary" style={{ paddingLeft: 8 }}>鏈珷鑺傛殏鏃犺鏃?/Text>
                                   ) : (
                                     <List
                                       size="small"
@@ -459,7 +467,7 @@ const CourseDetailPage: React.FC = () => {
                                       <Title level={5} style={{ marginTop: 0 }}>{activeSection.title}</Title>
                                       {activeSection.type === 'VIDEO' && activeSection.videoUrl ? (
                                         <div>
-                                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>视频链接：</Text>
+                                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>瑙嗛閾炬帴锛?/Text>
                                           <a href={activeSection.videoUrl} target="_blank" rel="noopener noreferrer">
                                             {activeSection.videoUrl}
                                           </a>
@@ -469,7 +477,7 @@ const CourseDetailPage: React.FC = () => {
                                           {activeSection.content}
                                         </Paragraph>
                                       ) : (
-                                        <Text type="secondary">暂无内容</Text>
+                                        <Text type="secondary">鏆傛棤鍐呭</Text>
                                       )}
                                     </div>
                                   )}
@@ -478,7 +486,7 @@ const CourseDetailPage: React.FC = () => {
                             })}
                           </Collapse>
                         ) : (
-                          <Text type="secondary">暂无章节</Text>
+                          <Text type="secondary">鏆傛棤绔犺妭</Text>
                         )}
                       </div>
                     ),
@@ -488,7 +496,7 @@ const CourseDetailPage: React.FC = () => {
                     label: (
                       <Space>
                         <DatabaseOutlined />
-                        知识库问答
+                        鐭ヨ瘑搴撻棶绛?
                       </Space>
                     ),
                     children: ragTab,
@@ -498,7 +506,7 @@ const CourseDetailPage: React.FC = () => {
                     label: (
                       <Space>
                         <CloudDownloadOutlined />
-                        资料下载
+                        璧勬枡涓嬭浇
                       </Space>
                     ),
                     children: (
@@ -514,18 +522,18 @@ const CourseDetailPage: React.FC = () => {
                                 href={item.url.startsWith('http') ? item.url : `${window.location.origin}${item.url}`}
                                 target="_blank"
                               >
-                                下载
+                                涓嬭浇
                               </Button>
                             ]}
                           >
                             <List.Item.Meta
                               avatar={<FileTextOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
                               title={item.name}
-                              description={`上传于: ${new Date(item.createdAt).toLocaleDateString()} · 大小: ${(item.size / 1024).toFixed(1)} KB`}
+                              description={`涓婁紶浜? ${new Date(item.createdAt).toLocaleDateString()} 路 澶у皬: ${(item.size / 1024).toFixed(1)} KB`}
                             />
                           </List.Item>
                         )}
-                        locale={{ emptyText: <Empty description="暂无相关学习资料" /> }}
+                        locale={{ emptyText: <Empty description="鏆傛棤鐩稿叧瀛︿範璧勬枡" /> }}
                       />
                     ),
                   },
@@ -535,12 +543,12 @@ const CourseDetailPage: React.FC = () => {
           </Card>
         </Col>
 
-        {/* ── 右栏：课程信息卡片 ── */}
+        {/* 鈹€鈹€ 鍙虫爮锛氳绋嬩俊鎭崱鐗?鈹€鈹€ */}
         <Col xs={24} lg={8}>
-          <Card title="课程信息">
+          <Card title="璇剧▼淇℃伅">
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <div>
-                <Text type="secondary">学习进度</Text>
+                <Text type="secondary">瀛︿範杩涘害</Text>
                 <div style={{ marginTop: 8 }}>
                   <Progress
                     type="circle"
@@ -551,22 +559,22 @@ const CourseDetailPage: React.FC = () => {
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <Text type="secondary">
-                    {completedChapters.size} / {chapters.length} 章节已完成
+                    {completedChapters.size} / {chapters.length} 绔犺妭宸插畬鎴?
                   </Text>
                 </div>
               </div>
 
               <div>
-                <Text type="secondary">分类</Text>
+                <Text type="secondary">鍒嗙被</Text>
                 <div>
                   {course.categoryName
                     ? <Tag color="blue">{course.categoryName}</Tag>
-                    : <Text type="secondary">未分类</Text>}
+                    : <Text type="secondary">鏈垎绫?/Text>}
                 </div>
               </div>
 
               <div>
-                <Text type="secondary">状态</Text>
+                <Text type="secondary">鐘舵€?/Text>
                 <div>
                   <Tag color={course.status === 'PUBLISHED' ? 'green' : 'orange'}>{course.status}</Tag>
                 </div>
@@ -580,3 +588,6 @@ const CourseDetailPage: React.FC = () => {
 };
 
 export default CourseDetailPage;
+
+
+

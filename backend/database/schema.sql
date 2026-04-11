@@ -1,7 +1,7 @@
--- SQLite数据库Schema (简化版)
--- 在线教育平台数据库
+-- SQLite鏁版嵁搴揝chema (绠€鍖栫増)
+-- 鍦ㄧ嚎鏁欒偛骞冲彴鏁版嵁搴?
 
--- 用户表
+-- 鐢ㄦ埛琛?
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -17,14 +17,14 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 课程分类表
+-- 璇剧▼鍒嗙被琛?
 CREATE TABLE IF NOT EXISTS course_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     description TEXT
 );
 
--- 课程表
+-- 璇剧▼琛?
 CREATE TABLE IF NOT EXISTS courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS courses (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 选课记录表
+-- 閫夎璁板綍琛?
 CREATE TABLE IF NOT EXISTS course_enrollments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
     UNIQUE(student_id, course_id)
 );
 
--- 课程章节表
+-- 璇剧▼绔犺妭琛?
 CREATE TABLE IF NOT EXISTS course_chapters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS course_chapters (
     order_index INTEGER NOT NULL DEFAULT 0
 );
 
--- 课时表
+-- 璇炬椂琛?
 CREATE TABLE IF NOT EXISTS course_sections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chapter_id INTEGER NOT NULL REFERENCES course_chapters(id) ON DELETE CASCADE,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS course_sections (
     resource_id INTEGER
 );
 
--- 作业表
+-- 浣滀笟琛?
 CREATE TABLE IF NOT EXISTS assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -76,20 +76,20 @@ CREATE TABLE IF NOT EXISTS assignments (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 作业提交表
+-- 浣滀笟鎻愪氦琛?
 CREATE TABLE IF NOT EXISTS assignment_submissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
     student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content TEXT,
-    attachments TEXT, -- JSON格式字符串
+    attachments TEXT, -- JSON鏍煎紡瀛楃涓?
     submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     grade REAL,
     feedback TEXT,
     UNIQUE(assignment_id, student_id)
 );
 
--- 考试表
+-- 鑰冭瘯琛?
 CREATE TABLE IF NOT EXISTS exams (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -99,19 +99,19 @@ CREATE TABLE IF NOT EXISTS exams (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 考试题目表
+-- 鑰冭瘯棰樼洰琛?
 CREATE TABLE IF NOT EXISTS exam_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK(type IN ('SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER')),
     stem TEXT NOT NULL,
-    options TEXT, -- JSON格式字符串
-    answer TEXT NOT NULL, -- JSON格式字符串
+    options TEXT, -- JSON鏍煎紡瀛楃涓?
+    answer TEXT NOT NULL, -- JSON鏍煎紡瀛楃涓?
     score REAL NOT NULL,
     order_index INTEGER NOT NULL DEFAULT 0
 );
 
--- 考卷提交表
+-- 鑰冨嵎鎻愪氦琛?
 CREATE TABLE IF NOT EXISTS exam_submissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     exam_id INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -121,17 +121,17 @@ CREATE TABLE IF NOT EXISTS exam_submissions (
     UNIQUE(exam_id, student_id)
 );
 
--- 考试答案表
+-- 鑰冭瘯绛旀琛?
 CREATE TABLE IF NOT EXISTS exam_answers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     submission_id INTEGER NOT NULL REFERENCES exam_submissions(id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
-    student_answer TEXT, -- JSON格式字符串
+    student_answer TEXT, -- JSON鏍煎紡瀛楃涓?
     score_awarded REAL,
-    time_spent INTEGER DEFAULT 0 -- 答题耗时（秒），用于题目难度分析（PLAN-03）
+    time_spent INTEGER DEFAULT 0 -- 绛旈鑰楁椂锛堢锛夛紝鐢ㄤ簬棰樼洰闅惧害鍒嗘瀽锛圥LAN-03锛?
 );
 
--- 消息表
+-- 娑堟伅琛?
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 通知表
+-- 閫氱煡琛?
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 讨论表
+-- 璁ㄨ琛?
 CREATE TABLE IF NOT EXISTS discussions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS discussions (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 讨论回复表
+-- 璁ㄨ鍥炲琛?
 CREATE TABLE IF NOT EXISTS discussion_replies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     discussion_id INTEGER NOT NULL REFERENCES discussions(id) ON DELETE CASCADE,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS discussion_replies (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 课程资料表
+-- 璇剧▼璧勬枡琛?
 CREATE TABLE IF NOT EXISTS course_materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS course_materials (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建索引
+-- 鍒涘缓绱㈠紩
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_courses_instructor_id ON courses(instructor_id);
@@ -216,7 +216,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 CREATE INDEX IF NOT EXISTS idx_discussions_status ON discussions(status);
 
--- 回复点赞表
+-- 鍥炲鐐硅禐琛?
 CREATE TABLE IF NOT EXISTS reply_likes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     reply_id    INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS reply_likes (
 CREATE INDEX IF NOT EXISTS idx_reply_likes_reply_id ON reply_likes(reply_id);
 CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id);
 
--- 回复收藏表
+-- 鍥炲鏀惰棌琛?
 CREATE TABLE IF NOT EXISTS reply_favorites (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     reply_id    INTEGER NOT NULL REFERENCES discussion_replies(id) ON DELETE CASCADE,
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS reply_favorites (
 CREATE INDEX IF NOT EXISTS idx_reply_favorites_reply_id ON reply_favorites(reply_id);
 CREATE INDEX IF NOT EXISTS idx_reply_favorites_user_id  ON reply_favorites(user_id);
 
--- AI 解析修改记录表（PLAN-05）
+-- AI 瑙ｆ瀽淇敼璁板綍琛紙PLAN-05锛?
 CREATE TABLE IF NOT EXISTS ai_corrections (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     exam_id        INTEGER NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS ai_corrections (
 CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id  ON ai_corrections(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id  ON ai_corrections(exam_id);
 
--- RAG 知识库表（"评-辅"闭环系统）
+-- RAG 鐭ヨ瘑搴撹〃锛?璇?杈?闂幆绯荤粺锛?
 CREATE TABLE IF NOT EXISTS rag_documents (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -276,13 +276,14 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 );
 
 CREATE TABLE IF NOT EXISTS rag_queries (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    course_id    INTEGER NOT NULL,
-    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    question     TEXT NOT NULL,
-    answer       TEXT,
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id     INTEGER NOT NULL,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id    TEXT,
+    question      TEXT NOT NULL,
+    answer        TEXT,
     source_chunks TEXT,
-    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_rag_documents_course_id ON rag_documents(course_id);
@@ -290,3 +291,4 @@ CREATE INDEX IF NOT EXISTS idx_rag_chunks_doc_id       ON rag_chunks(doc_id);
 CREATE INDEX IF NOT EXISTS idx_rag_chunks_course_id    ON rag_chunks(course_id);
 CREATE INDEX IF NOT EXISTS idx_rag_queries_course_id   ON rag_queries(course_id);
 CREATE INDEX IF NOT EXISTS idx_rag_queries_user_id     ON rag_queries(user_id);
+

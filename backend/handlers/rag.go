@@ -1,468 +1,610 @@
 package handlers
 
 import (
-	"database/sql"
-	"encoding/json"
-	"io"
-	"os"
-	"strconv"
-	"time"
+    "database/sql"
+    "encoding/json"
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+    "time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/online-education-platform/backend/database"
-	original_rag "github.com/online-education-platform/backend/rag"
-	"github.com/online-education-platform/backend/utils"
-	"go.uber.org/zap"
+    "github.com/gin-gonic/gin"
+    "github.com/online-education-platform/backend/database"
+    ragpkg "github.com/online-education-platform/backend/rag"
+    "github.com/online-education-platform/backend/utils"
+    "go.uber.org/zap"
 )
 
-const ragMaxChunks = 200
+const (
+    ragMaxChunks    = 200
+    ragChunkSize    = 600
+    ragChunkOverlap = 80
+    ragTopK         = 5
+)
 
-// ---- 权限辅助 ----
+type ragSource struct {
+    ChunkID    int64  `json:"chunkId"`
+    DocumentID int64  `json:"documentId"`
+    Filename   string `json:"filename"`
+    ChunkIndex int    `json:"chunkIndex"`
+    Content    string `json:"content"`
+}
+
+type ragQueryHistoryItem struct {
+    ID        int64       `json:"id"`
+    UserID    int64       `json:"user_id"`
+    SessionID string      `json:"session_id"`
+    Question  string      `json:"question"`
+    Answer    string      `json:"answer"`
+    Sources   []ragSource `json:"sources"`
+    CreatedAt string      `json:"created_at"`
+}
+
+type storedRAGChunk struct {
+    ragpkg.Chunk
+    ChunkIndex int
+    Filename   string
+}
 
 func isCourseInstructorOrAdmin(c *gin.Context, courseID int64) bool {
-	roleVal, _ := c.Get("role")
-	role, _ := roleVal.(string)
-	if role == "ADMIN" {
-		return true
-	}
-	if role != "INSTRUCTOR" {
-		return false
-	}
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
-	var instructorID int64
-	err := database.DB.QueryRow(`SELECT instructor_id FROM courses WHERE id = ?`, courseID).Scan(&instructorID)
-	return err == nil && instructorID == userID
+    roleVal, _ := c.Get("role")
+    role, _ := roleVal.(string)
+    if role == "ADMIN" {
+        return true
+    }
+    if role != "INSTRUCTOR" {
+        return false
+    }
+
+    userIDVal, _ := c.Get("userID")
+    userID, _ := userIDVal.(int64)
+
+    var instructorID int64
+    err := database.DB.QueryRow(`SELECT instructor_id FROM courses WHERE id = ?`, courseID).Scan(&instructorID)
+    return err == nil && instructorID == userID
 }
 
 func isCourseAccessible(c *gin.Context, courseID int64) bool {
-	if isCourseInstructorOrAdmin(c, courseID) {
-		return true
-	}
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
-	var count int
-	database.DB.QueryRow(`SELECT COUNT(*) FROM course_enrollments WHERE course_id=? AND student_id=?`, courseID, userID).Scan(&count) //nolint:errcheck
-	return count > 0
+    if isCourseInstructorOrAdmin(c, courseID) {
+        return true
+    }
+
+    userIDVal, _ := c.Get("userID")
+    userID, _ := userIDVal.(int64)
+
+    var count int
+    database.DB.QueryRow(
+        `SELECT COUNT(*) FROM course_enrollments WHERE course_id = ? AND student_id = ?`,
+        courseID,
+        userID,
+    ).Scan(&count) //nolint:errcheck
+    return count > 0
 }
 
-// ---- UploadRAGDocument ----
+func getRAGConfig() (apiKey, baseURL, model string, err error) {
+    apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+    if apiKey == "" {
+        return "", "", "", fmt.Errorf("缺少 OPENAI_API_KEY 配置，无法执行 RAG 向量化或问答")
+    }
 
-// UploadRAGDocument POST /courses/:id/rag/documents
+    baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
+    model = strings.TrimSpace(os.Getenv("LLM_MODEL"))
+    return apiKey, baseURL, model, nil
+}
+
+func getCurrentUserID(c *gin.Context) int64 {
+    userIDVal, _ := c.Get("userID")
+    userID, _ := userIDVal.(int64)
+    return userID
+}
+
+func defaultSessionID(courseID, userID int64, sessionID string) string {
+    sessionID = strings.TrimSpace(sessionID)
+    if sessionID != "" {
+        return sessionID
+    }
+    return fmt.Sprintf("course_%d_user_%d", courseID, userID)
+}
+
+func loadRecentRAGHistory(courseID, userID int64, sessionID string, limit int) ([]ragpkg.ChatMessage, error) {
+    if sessionID == "" || limit <= 0 {
+        return nil, nil
+    }
+
+    rows, err := database.DB.Query(
+        `SELECT question, answer
+         FROM rag_queries
+         WHERE course_id = ? AND user_id = ? AND session_id = ?
+         ORDER BY created_at DESC
+         LIMIT ?`,
+        courseID, userID, sessionID, limit,
+    )
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    type pair struct {
+        question string
+        answer   string
+    }
+
+    pairs := make([]pair, 0, limit)
+    for rows.Next() {
+        var item pair
+        var answer sql.NullString
+        if err := rows.Scan(&item.question, &answer); err != nil {
+            continue
+        }
+        item.answer = answer.String
+        pairs = append(pairs, item)
+    }
+
+    history := make([]ragpkg.ChatMessage, 0, len(pairs)*2)
+    for i := len(pairs) - 1; i >= 0; i-- {
+        history = append(history, ragpkg.ChatMessage{Role: "user", Content: pairs[i].question})
+        if strings.TrimSpace(pairs[i].answer) != "" {
+            history = append(history, ragpkg.ChatMessage{Role: "assistant", Content: pairs[i].answer})
+        }
+    }
+    return history, nil
+}
+
+func fetchCourseChunks(courseID int64) ([]storedRAGChunk, error) {
+    rows, err := database.DB.Query(
+        `SELECT c.id, c.doc_id, c.chunk_index, c.content, c.embedding, d.filename
+         FROM rag_chunks c
+         JOIN rag_documents d ON d.id = c.doc_id
+         WHERE c.course_id = ? AND c.embedding IS NOT NULL AND c.embedding != ''
+         ORDER BY c.doc_id ASC, c.chunk_index ASC`,
+        courseID,
+    )
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    chunks := make([]storedRAGChunk, 0)
+    for rows.Next() {
+        var item storedRAGChunk
+        var embedding string
+        if err := rows.Scan(&item.ID, &item.DocID, &item.ChunkIndex, &item.Content, &embedding, &item.Filename); err != nil {
+            continue
+        }
+        if err := json.Unmarshal([]byte(embedding), &item.Embedding); err != nil || len(item.Embedding) == 0 {
+            continue
+        }
+        chunks = append(chunks, item)
+    }
+
+    return chunks, nil
+}
+
+func buildRAGSources(chunks []storedRAGChunk) ([]ragSource, []string, []int64) {
+    sources := make([]ragSource, 0, len(chunks))
+    contexts := make([]string, 0, len(chunks))
+    sourceIDs := make([]int64, 0, len(chunks))
+
+    for _, chunk := range chunks {
+        sources = append(sources, ragSource{
+            ChunkID:    chunk.ID,
+            DocumentID: chunk.DocID,
+            Filename:   chunk.Filename,
+            ChunkIndex: chunk.ChunkIndex,
+            Content:    chunk.Content,
+        })
+        contexts = append(contexts, chunk.Content)
+        sourceIDs = append(sourceIDs, chunk.ID)
+    }
+
+    return sources, contexts, sourceIDs
+}
+
+func decodeSourceIDs(raw string) []int64 {
+    raw = strings.TrimSpace(raw)
+    if raw == "" {
+        return nil
+    }
+
+    var ids []int64
+    if err := json.Unmarshal([]byte(raw), &ids); err == nil {
+        return ids
+    }
+    return nil
+}
+
+func loadSourcesByChunkIDs(chunkIDs []int64) ([]ragSource, error) {
+    if len(chunkIDs) == 0 {
+        return []ragSource{}, nil
+    }
+
+    placeholders := make([]string, 0, len(chunkIDs))
+    args := make([]interface{}, 0, len(chunkIDs))
+    for _, id := range chunkIDs {
+        placeholders = append(placeholders, "?")
+        args = append(args, id)
+    }
+
+    rows, err := database.DB.Query(
+        fmt.Sprintf(
+            `SELECT c.id, c.doc_id, d.filename, c.chunk_index, c.content
+             FROM rag_chunks c
+             JOIN rag_documents d ON d.id = c.doc_id
+             WHERE c.id IN (%s)`,
+            strings.Join(placeholders, ","),
+        ),
+        args...,
+    )
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    sourceMap := make(map[int64]ragSource, len(chunkIDs))
+    for rows.Next() {
+        var source ragSource
+        if err := rows.Scan(&source.ChunkID, &source.DocumentID, &source.Filename, &source.ChunkIndex, &source.Content); err != nil {
+            continue
+        }
+        sourceMap[source.ChunkID] = source
+    }
+
+    sources := make([]ragSource, 0, len(chunkIDs))
+    for _, id := range chunkIDs {
+        if source, ok := sourceMap[id]; ok {
+            sources = append(sources, source)
+        }
+    }
+    return sources, nil
+}
+
+func saveRAGQuery(courseID, userID int64, sessionID, question, answer string, sourceIDs []int64) {
+    sourceJSON, _ := json.Marshal(sourceIDs)
+    if _, err := database.DB.Exec(
+        `INSERT INTO rag_queries(course_id, user_id, session_id, question, answer, source_chunks, created_at)
+         VALUES(?,?,?,?,?,?,?)`,
+        courseID, userID, sessionID, question, answer, string(sourceJSON), time.Now(),
+    ); err != nil {
+        utils.GetLogger().Warn("failed to persist rag query", zap.Error(err))
+    }
+}
+
+func parseCourseID(c *gin.Context) (int64, bool) {
+    courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+    if err != nil {
+        utils.BadRequest(c, "无效的课程 ID")
+        return 0, false
+    }
+    return courseID, true
+}
+
 func UploadRAGDocument(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	if !isCourseInstructorOrAdmin(c, courseID) {
-		utils.Forbidden(c, "权限不足，仅课程教师或管理员可上传知识库文档")
-		return
-	}
+    courseID, ok := parseCourseID(c)
+    if !ok {
+        return
+    }
+    if !isCourseInstructorOrAdmin(c, courseID) {
+        utils.Forbidden(c, "仅课程教师或管理员可以上传知识库文档")
+        return
+    }
 
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		utils.BadRequest(c, "请上传文件（字段名: file）")
-		return
-	}
-	defer file.Close()
+    apiKey, baseURL, _, cfgErr := getRAGConfig()
+    if cfgErr != nil {
+        utils.InternalServerError(c, cfgErr.Error())
+        return
+    }
 
-	raw, err := io.ReadAll(file)
-	if err != nil {
-		utils.InternalServerError(c, "读取文件失败")
-		return
-	}
-	text := string(raw)
-	charCount := len([]rune(text))
+    file, header, err := c.Request.FormFile("file")
+    if err != nil {
+        utils.BadRequest(c, "请上传 file 字段的文档")
+        return
+    }
+    defer file.Close()
 
-	chunks := original_rag.ChunkText(text, 500, 50)
-	if len(chunks) == 0 {
-		utils.BadRequest(c, "文件内容为空")
-		return
-	}
-	if len(chunks) > ragMaxChunks {
-		chunks = chunks[:ragMaxChunks]
-	}
+    text, err := ragpkg.ExtractText(header.Filename, file)
+    if err != nil {
+        utils.BadRequest(c, "文档解析失败: "+err.Error())
+        return
+    }
 
-	embedClient := &original_rag.EmbedClient{
-		APIKey:  utils.GetEnv("OPENAI_API_KEY", "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"),
-		BaseURL: utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-	}
-	embeddings, err := embedClient.Embed(chunks)
-	if err != nil {
-		utils.GetLogger().Error("RAG embedding 失败", zap.Error(err))
-		utils.InternalServerError(c, "向量化失败: "+err.Error())
-		return
-	}
+    charCount := len([]rune(text))
+    if charCount == 0 {
+        utils.BadRequest(c, "文档内容为空")
+        return
+    }
 
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
+    chunks := ragpkg.ChunkText(text, ragChunkSize, ragChunkOverlap)
+    if len(chunks) == 0 {
+        utils.BadRequest(c, "文档内容为空")
+        return
+    }
+    if len(chunks) > ragMaxChunks {
+        chunks = chunks[:ragMaxChunks]
+    }
 
-	res, err := database.DB.Exec(
-		`INSERT INTO rag_documents(course_id, filename, char_count, chunk_count, created_by, created_at)
-		 VALUES(?,?,?,?,?,?)`,
-		courseID, header.Filename, charCount, len(chunks), userID, time.Now(),
-	)
-	if err != nil {
-		utils.InternalServerError(c, "保存文档记录失败")
-		return
-	}
-	docID, _ := res.LastInsertId()
+    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+    embeddings, err := embedClient.Embed(chunks)
+    if err != nil {
+        utils.GetLogger().Error("rag embedding failed", zap.Error(err))
+        utils.InternalServerError(c, "文档向量化失败: "+err.Error())
+        return
+    }
 
-	for i, content := range chunks {
-		var embJSON []byte
-		if i < len(embeddings) && embeddings[i] != nil {
-			embJSON, _ = json.Marshal(embeddings[i])
-		}
-		database.DB.Exec( //nolint:errcheck
-			`INSERT INTO rag_chunks(doc_id, course_id, chunk_index, content, embedding, created_at)
-			 VALUES(?,?,?,?,?,?)`,
-			docID, courseID, i, content, string(embJSON), time.Now(),
-		)
-	}
+    userID := getCurrentUserID(c)
+    tx, err := database.DB.Begin()
+    if err != nil {
+        utils.InternalServerError(c, "创建文档事务失败")
+        return
+    }
+    defer tx.Rollback() //nolint:errcheck
 
-	utils.GetLogger().Info("RAG 文档上传完成",
-		zap.String("filename", header.Filename),
-		zap.Int("chunks", len(chunks)),
-	)
-	utils.Success(c, gin.H{
-		"doc_id":      docID,
-		"filename":    header.Filename,
-		"char_count":  charCount,
-		"chunk_count": len(chunks),
-	})
+    res, err := tx.Exec(
+        `INSERT INTO rag_documents(course_id, filename, char_count, chunk_count, created_by, created_at)
+         VALUES(?,?,?,?,?,?)`,
+        courseID, header.Filename, charCount, len(chunks), userID, time.Now(),
+    )
+    if err != nil {
+        utils.InternalServerError(c, "保存文档记录失败")
+        return
+    }
+    docID, _ := res.LastInsertId()
+
+    for i, content := range chunks {
+        embeddingJSON, _ := json.Marshal(embeddings[i])
+        if _, err := tx.Exec(
+            `INSERT INTO rag_chunks(doc_id, course_id, chunk_index, content, embedding, created_at)
+             VALUES(?,?,?,?,?,?)`,
+            docID, courseID, i, content, string(embeddingJSON), time.Now(),
+        ); err != nil {
+            utils.InternalServerError(c, "保存文档分块失败")
+            return
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        utils.InternalServerError(c, "提交文档失败")
+        return
+    }
+
+    utils.Success(c, gin.H{
+        "id":          docID,
+        "filename":    header.Filename,
+        "char_count":  charCount,
+        "chunk_count": len(chunks),
+    })
 }
 
-// ---- ListRAGDocuments ----
-
-// ListRAGDocuments GET /courses/:id/rag/documents
 func ListRAGDocuments(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	if !isCourseAccessible(c, courseID) {
-		utils.Forbidden(c, "权限不足")
-		return
-	}
+    courseID, ok := parseCourseID(c)
+    if !ok {
+        return
+    }
+    if !isCourseAccessible(c, courseID) {
+        utils.Forbidden(c, "没有权限访问该课程知识库")
+        return
+    }
 
-	rows, err := database.DB.Query(
-		`SELECT d.id, d.filename, d.char_count, d.chunk_count, d.created_at, u.username
-		 FROM rag_documents d
-		 JOIN users u ON u.id = d.created_by
-		 WHERE d.course_id = ?
-		 ORDER BY d.created_at DESC`,
-		courseID,
-	)
-	if err != nil {
-		utils.InternalServerError(c, "查询失败")
-		return
-	}
-	defer rows.Close()
+    rows, err := database.DB.Query(
+        `SELECT d.id, d.filename, d.char_count, d.chunk_count, d.created_at, u.username
+         FROM rag_documents d
+         JOIN users u ON u.id = d.created_by
+         WHERE d.course_id = ?
+         ORDER BY d.created_at DESC`,
+        courseID,
+    )
+    if err != nil {
+        utils.InternalServerError(c, "查询知识库文档失败")
+        return
+    }
+    defer rows.Close()
 
-	type docItem struct {
-		ID         int64  `json:"id"`
-		Filename   string `json:"filename"`
-		CharCount  int    `json:"char_count"`
-		ChunkCount int    `json:"chunk_count"`
-		CreatedAt  string `json:"created_at"`
-		CreatedBy  string `json:"created_by"`
-	}
-	docs := make([]docItem, 0)
-	for rows.Next() {
-		var d docItem
-		var t time.Time
-		if err := rows.Scan(&d.ID, &d.Filename, &d.CharCount, &d.ChunkCount, &t, &d.CreatedBy); err != nil {
-			continue
-		}
-		d.CreatedAt = t.Format(time.RFC3339)
-		docs = append(docs, d)
-	}
-	utils.Success(c, docs)
+    type item struct {
+        ID         int64  `json:"id"`
+        Filename   string `json:"filename"`
+        CharCount  int    `json:"char_count"`
+        ChunkCount int    `json:"chunk_count"`
+        CreatedAt  string `json:"created_at"`
+        CreatedBy  string `json:"created_by"`
+    }
+
+    result := make([]item, 0)
+    for rows.Next() {
+        var doc item
+        var createdAt time.Time
+        if err := rows.Scan(&doc.ID, &doc.Filename, &doc.CharCount, &doc.ChunkCount, &createdAt, &doc.CreatedBy); err != nil {
+            continue
+        }
+        doc.CreatedAt = createdAt.Format(time.RFC3339)
+        result = append(result, doc)
+    }
+
+    utils.Success(c, result)
 }
 
-// ---- DeleteRAGDocument ----
-
-// DeleteRAGDocument DELETE /courses/:id/rag/documents/:docId
 func DeleteRAGDocument(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	docID, err := strconv.ParseInt(c.Param("docId"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的文件 ID")
-		return
-	}
-	if !isCourseInstructorOrAdmin(c, courseID) {
-		utils.Forbidden(c, "权限不足")
-		return
-	}
+    courseID, ok := parseCourseID(c)
+    if !ok {
+        return
+    }
+    docID, err := strconv.ParseInt(c.Param("docId"), 10, 64)
+    if err != nil {
+        utils.BadRequest(c, "无效的文档 ID")
+        return
+    }
+    if !isCourseInstructorOrAdmin(c, courseID) {
+        utils.Forbidden(c, "没有权限删除该文档")
+        return
+    }
 
-	var cnt int
-	database.DB.QueryRow(`SELECT COUNT(*) FROM rag_documents WHERE id=? AND course_id=?`, docID, courseID).Scan(&cnt) //nolint:errcheck
-	if cnt == 0 {
-		utils.NotFound(c, "文档不存在或不属于该课程")
-		return
-	}
+    var count int
+    database.DB.QueryRow(
+        `SELECT COUNT(*) FROM rag_documents WHERE id = ? AND course_id = ?`,
+        docID, courseID,
+    ).Scan(&count) //nolint:errcheck
+    if count == 0 {
+        utils.NotFound(c, "文档不存在或不属于当前课程")
+        return
+    }
 
-	if _, err := database.DB.Exec(`DELETE FROM rag_documents WHERE id=?`, docID); err != nil {
-		utils.InternalServerError(c, "删除失败")
-		return
-	}
-	utils.Success(c, gin.H{"deleted": true})
+    if _, err := database.DB.Exec(`DELETE FROM rag_documents WHERE id = ?`, docID); err != nil {
+        utils.InternalServerError(c, "删除文档失败")
+        return
+    }
+
+    utils.Success(c, gin.H{"deleted": true})
 }
 
-// ---- QueryRAGExtended ----
-
-// QueryRAGExtended POST /courses/:id/rag/query
 func QueryRAGExtended(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	if !isCourseAccessible(c, courseID) {
-		utils.Forbidden(c, "请先选课")
-		return
-	}
+    courseID, ok := parseCourseID(c)
+    if !ok {
+        return
+    }
+    if !isCourseAccessible(c, courseID) {
+        utils.Forbidden(c, "请先选课后再访问课程知识库")
+        return
+    }
 
-	var req struct {
-		Question  string `json:"question" binding:"required"`
-		SessionID string `json:"session_id"` // 可选，用于多轮对话记忆
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(c, "参数错误")
-		return
-	}
+    var req struct {
+        Question  string `json:"question" binding:"required"`
+        SessionID string `json:"session_id"`
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.BadRequest(c, "请提供 question 字段")
+        return
+    }
 
-	apiKey := utils.GetEnv("OPENAI_API_KEY", "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")
-	baseURL := utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+    req.Question = strings.TrimSpace(req.Question)
+    if req.Question == "" {
+        utils.BadRequest(c, "问题不能为空")
+        return
+    }
 
-	// 1. 检索上下文 (常规逻辑)
-	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
-	queryEmbeddings, _ := embedClient.Embed([]string{req.Question})
-	queryVec := queryEmbeddings[0]
+    apiKey, baseURL, model, cfgErr := getRAGConfig()
+    if cfgErr != nil {
+        utils.InternalServerError(c, cfgErr.Error())
+        return
+    }
 
-	chunkRows, _ := database.DB.Query(`SELECT id, content, embedding FROM rag_chunks WHERE course_id=?`, courseID)
-	var allChunks []original_rag.Chunk
-	for chunkRows.Next() {
-		var ch original_rag.Chunk
-		var embStr string
-		chunkRows.Scan(&ch.ID, &ch.Content, &embStr)
-		json.Unmarshal([]byte(embStr), &ch.Embedding)
-		allChunks = append(allChunks, ch)
-	}
-	topChunks := original_rag.TopK(queryVec, allChunks, 5)
-	contexts := make([]string, len(topChunks))
-	for i, ch := range topChunks {
-		contexts[i] = ch.Content
-	}
+    userID := getCurrentUserID(c)
+    sessionID := defaultSessionID(courseID, userID, req.SessionID)
 
-	// 2. 模拟多轮对话记忆 (简单的数据库实现，若无 Redis)
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
-	
-	history := []original_rag.ChatMessage{}
-	if req.SessionID != "" {
-		// 从数据库 rag_queries 中拉取最近 5 轮该 Session 的对话
-		rows, _ := database.DB.Query(`
-			SELECT question, answer FROM rag_queries 
-			WHERE course_id=? AND user_id=? AND session_id=? 
-			ORDER BY created_at DESC LIMIT 5`, 
-			courseID, userID, req.SessionID,
-		)
-		for rows.Next() {
-			var q, a string
-			rows.Scan(&q, &a)
-			history = append([]original_rag.ChatMessage{
-				{Role: "user", Content: q},
-				{Role: "assistant", Content: a},
-			}, history...)
-		}
-		rows.Close()
-	}
+    allChunks, err := fetchCourseChunks(courseID)
+    if err != nil {
+        utils.InternalServerError(c, "读取课程知识库失败")
+        return
+    }
+    if len(allChunks) == 0 {
+        utils.Success(c, gin.H{
+            "answer":     "当前课程还没有可用的知识库文档，请先由教师上传课程资料。",
+            "sources":    []ragSource{},
+            "session_id": sessionID,
+        })
+        return
+    }
 
-	// 3. 生成回答
-	genClient := &original_rag.GenClient{APIKey: apiKey, BaseURL: baseURL}
-	answer, err := genClient.GenerateWithHistory(req.Question, contexts, history)
-	if err != nil {
-		utils.InternalServerError(c, "生成失败")
-		return
-	}
+    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+    queryEmbeddings, err := embedClient.Embed([]string{req.Question})
+    if err != nil || len(queryEmbeddings) == 0 || len(queryEmbeddings[0]) == 0 {
+        if err == nil {
+            err = fmt.Errorf("问题向量为空")
+        }
+        utils.InternalServerError(c, "问题向量化失败: "+err.Error())
+        return
+    }
 
-	// 4. 保存对话记录
-	database.DB.Exec(
-		`INSERT INTO rag_queries(course_id, user_id, session_id, question, answer, created_at)
-		 VALUES(?,?,?,?,?,?)`,
-		courseID, userID, req.SessionID, req.Question, answer, time.Now(),
-	)
+    baseChunks := make([]ragpkg.Chunk, 0, len(allChunks))
+    chunkMap := make(map[int64]storedRAGChunk, len(allChunks))
+    for _, chunk := range allChunks {
+        baseChunks = append(baseChunks, chunk.Chunk)
+        chunkMap[chunk.ID] = chunk
+    }
 
-	utils.Success(c, gin.H{"answer": answer})
+    topBaseChunks := ragpkg.TopK(queryEmbeddings[0], baseChunks, ragTopK)
+    if len(topBaseChunks) == 0 {
+        utils.Success(c, gin.H{
+            "answer":     "当前课程资料中没有找到与问题相关的内容，请换个问法或先补充课程资料。",
+            "sources":    []ragSource{},
+            "session_id": sessionID,
+        })
+        return
+    }
+
+    selected := make([]storedRAGChunk, 0, len(topBaseChunks))
+    for _, chunk := range topBaseChunks {
+        if full, ok := chunkMap[chunk.ID]; ok {
+            selected = append(selected, full)
+        }
+    }
+    sources, contexts, sourceIDs := buildRAGSources(selected)
+
+    history, err := loadRecentRAGHistory(courseID, userID, sessionID, 5)
+    if err != nil {
+        utils.GetLogger().Warn("failed to load rag history", zap.Error(err))
+    }
+
+    genClient := &ragpkg.GenClient{APIKey: apiKey, BaseURL: baseURL, Model: model}
+    answer, err := genClient.GenerateWithHistory(req.Question, contexts, history)
+    if err != nil {
+        utils.GetLogger().Error("rag generation failed", zap.Error(err))
+        utils.InternalServerError(c, "生成回答失败: "+err.Error())
+        return
+    }
+
+    saveRAGQuery(courseID, userID, sessionID, req.Question, answer, sourceIDs)
+    utils.Success(c, gin.H{
+        "answer":     answer,
+        "sources":    sources,
+        "session_id": sessionID,
+    })
 }
 
-// ---- QueryRAG ----
-
-// QueryRAG POST /courses/:id/rag/query
 func QueryRAG(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	if !isCourseAccessible(c, courseID) {
-		utils.Forbidden(c, "请先选课或确认教师/管理员权限")
-		return
-	}
-
-	var req struct {
-		Question string `json:"question" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(c, "请提供 question 字段")
-		return
-	}
-
-	apiKey := utils.GetEnv("OPENAI_API_KEY", "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")
-	baseURL := utils.GetEnv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-
-	embedClient := &original_rag.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
-	queryEmbeddings, err := embedClient.Embed([]string{req.Question})
-	if err != nil {
-		utils.InternalServerError(c, "问题向量化失败: "+err.Error())
-		return
-	}
-	if len(queryEmbeddings) == 0 || queryEmbeddings[0] == nil {
-		utils.InternalServerError(c, "问题向量化返回空结果")
-		return
-	}
-	queryVec := queryEmbeddings[0]
-
-	chunkRows, err := database.DB.Query(
-		`SELECT id, doc_id, content, embedding FROM rag_chunks
-		 WHERE course_id=? AND embedding IS NOT NULL AND embedding != ''`,
-		courseID,
-	)
-	if err != nil {
-		utils.InternalServerError(c, "检索失败")
-		return
-	}
-	defer chunkRows.Close()
-
-	var allChunks []original_rag.Chunk
-	for chunkRows.Next() {
-		var ch original_rag.Chunk
-		var embStr string
-		if err := chunkRows.Scan(&ch.ID, &ch.DocID, &ch.Content, &embStr); err != nil {
-			continue
-		}
-		var emb []float32
-		if err := json.Unmarshal([]byte(embStr), &emb); err == nil {
-			ch.Embedding = emb
-		}
-		allChunks = append(allChunks, ch)
-	}
-
-	if len(allChunks) == 0 {
-		utils.Success(c, gin.H{
-			"answer":  "该课程暂无知识库文档，请教师先上传资料。",
-			"sources": []string{},
-		})
-		return
-	}
-
-	topChunks := original_rag.TopK(queryVec, allChunks, 5)
-	contexts := make([]string, len(topChunks))
-	sourceIDs := make([]int64, len(topChunks))
-	for i, ch := range topChunks {
-		contexts[i] = ch.Content
-		sourceIDs[i] = ch.ID
-	}
-
-	genClient := &original_rag.GenClient{
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-		Model:   utils.GetEnv("LLM_MODEL", "google/gemini-2.5-flash-preview"),
-	}
-	answer, err := genClient.Generate(req.Question, contexts)
-	if err != nil {
-		utils.GetLogger().Error("RAG 生成失败", zap.Error(err))
-		utils.InternalServerError(c, "生成答案失败: "+err.Error())
-		return
-	}
-
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
-	sourceJSON, _ := json.Marshal(sourceIDs)
-	database.DB.Exec( //nolint:errcheck
-		`INSERT INTO rag_queries(course_id, user_id, question, answer, source_chunks, created_at)
-		 VALUES(?,?,?,?,?,?)`,
-		courseID, userID, req.Question, answer, string(sourceJSON), time.Now(),
-	)
-
-	utils.Success(c, gin.H{
-		"answer":  answer,
-		"sources": contexts,
-	})
+    QueryRAGExtended(c)
 }
 
-// ---- GetRAGQueryHistory ----
-
-// GetRAGQueryHistory GET /courses/:id/rag/queries
 func GetRAGQueryHistory(c *gin.Context) {
-	courseID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		utils.BadRequest(c, "无效的课程 ID")
-		return
-	}
-	if !isCourseAccessible(c, courseID) {
-		utils.Forbidden(c, "权限不足")
-		return
-	}
+    courseID, ok := parseCourseID(c)
+    if !ok {
+        return
+    }
+    if !isCourseAccessible(c, courseID) {
+        utils.Forbidden(c, "没有权限访问该课程知识库")
+        return
+    }
 
-	userIDVal, _ := c.Get("userID")
-	userID, _ := userIDVal.(int64)
+    userID := getCurrentUserID(c)
+    query := `SELECT id, user_id, COALESCE(session_id, ''), question, answer, COALESCE(source_chunks, ''), created_at
+              FROM rag_queries
+              WHERE course_id = ?`
+    args := []interface{}{courseID}
+    if !isCourseInstructorOrAdmin(c, courseID) {
+        query += ` AND user_id = ?`
+        args = append(args, userID)
+    }
+    query += ` ORDER BY created_at DESC LIMIT 50`
 
-	var rows *sql.Rows
-	if isCourseInstructorOrAdmin(c, courseID) {
-		rows, err = database.DB.Query(
-			`SELECT id, user_id, question, answer, created_at FROM rag_queries
-			 WHERE course_id=? ORDER BY created_at DESC LIMIT 100`,
-			courseID,
-		)
-	} else {
-		rows, err = database.DB.Query(
-			`SELECT id, user_id, question, answer, created_at FROM rag_queries
-			 WHERE course_id=? AND user_id=? ORDER BY created_at DESC LIMIT 50`,
-			courseID, userID,
-		)
-	}
-	if err != nil {
-		utils.InternalServerError(c, "查询历史失败")
-		return
-	}
-	defer rows.Close()
+    rows, err := database.DB.Query(query, args...)
+    if err != nil {
+        utils.InternalServerError(c, "查询问答历史失败")
+        return
+    }
+    defer rows.Close()
 
-	type queryItem struct {
-		ID        int64  `json:"id"`
-		UserID    int64  `json:"user_id"`
-		Question  string `json:"question"`
-		Answer    string `json:"answer"`
-		CreatedAt string `json:"created_at"`
-	}
-	result := make([]queryItem, 0)
-	for rows.Next() {
-		var q queryItem
-		var t time.Time
-		var answer sql.NullString
-		if err := rows.Scan(&q.ID, &q.UserID, &q.Question, &answer, &t); err != nil {
-			continue
-		}
-		q.Answer = answer.String
-		q.CreatedAt = t.Format(time.RFC3339)
-		result = append(result, q)
-	}
-	utils.Success(c, result)
+    result := make([]ragQueryHistoryItem, 0)
+    for rows.Next() {
+        var item ragQueryHistoryItem
+        var answer sql.NullString
+        var rawSources string
+        var createdAt time.Time
+        if err := rows.Scan(&item.ID, &item.UserID, &item.SessionID, &item.Question, &answer, &rawSources, &createdAt); err != nil {
+            continue
+        }
+        item.Answer = answer.String
+        item.CreatedAt = createdAt.Format(time.RFC3339)
+        item.Sources, _ = loadSourcesByChunkIDs(decodeSourceIDs(rawSources))
+        result = append(result, item)
+    }
+
+    utils.Success(c, result)
 }

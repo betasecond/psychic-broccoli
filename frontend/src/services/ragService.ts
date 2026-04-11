@@ -5,25 +5,35 @@ export interface RagDocument {
   filename: string
   char_count: number
   chunk_count: number
-  created_at: string
-  created_by: string
+  created_at?: string
+  created_by?: string
+}
+
+export interface RagSource {
+  chunkId: number
+  documentId: number
+  filename: string
+  chunkIndex: number
+  content: string
 }
 
 export interface RagQueryResult {
   answer: string
-  sources: string[]
+  sources: RagSource[]
+  session_id?: string
 }
 
 export interface RagQueryHistory {
   id: number
   user_id: number
+  session_id?: string
   question: string
   answer: string
+  sources: RagSource[]
   created_at: string
 }
 
 const ragService = {
-  // 教师上传文档
   uploadDocument(courseId: number, file: File): Promise<RagDocument> {
     const form = new FormData()
     form.append('file', file)
@@ -32,25 +42,21 @@ const ragService = {
     })
   },
 
-  // 列出课程知识库文档
   listDocuments(courseId: number): Promise<RagDocument[]> {
     return api.get(`/courses/${courseId}/rag/documents`)
   },
 
-  // 删除文档
   deleteDocument(courseId: number, docId: number): Promise<void> {
     return api.delete(`/courses/${courseId}/rag/documents/${docId}`)
   },
 
-  // 提问
   query(courseId: number, question: string, sessionId?: string): Promise<RagQueryResult> {
-    return api.post(`/courses/${courseId}/rag/query`, { 
+    return api.post(`/courses/${courseId}/rag/query`, {
       question,
-      session_id: sessionId || `session_${courseId}` // 默认按课程隔离会话
+      session_id: sessionId,
     })
   },
 
-  // 查询历史
   getHistory(courseId: number): Promise<RagQueryHistory[]> {
     return api.get(`/courses/${courseId}/rag/queries`)
   },
