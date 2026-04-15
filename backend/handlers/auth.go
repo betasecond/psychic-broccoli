@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +10,7 @@ import (
 	"github.com/online-education-platform/backend/utils"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -134,12 +134,9 @@ func Register(c *gin.Context) {
 	}
 
 	// 验证角色
-	role := req.Role
-	if role == "" {
-		role = "STUDENT"
-	}
-	if role != "STUDENT" && role != "INSTRUCTOR" {
-		utils.BadRequest(c, "无效的角色类型")
+	role := "STUDENT"
+	if req.Role != "" && req.Role != "STUDENT" {
+		utils.BadRequest(c, "\u516c\u5f00\u6ce8\u518c\u4ec5\u5141\u8bb8\u521b\u5efa\u5b66\u751f\u8d26\u53f7")
 		return
 	}
 
@@ -201,9 +198,9 @@ func GetCurrentUser(c *gin.Context) {
 	}
 	if err != nil {
 		// --- 修改开始：打印详细错误日志 ---
-		fmt.Printf("❌ [Auth] GetCurrentUser DB Error: %v\n", err)
+		utils.GetLogger().Error("get current user failed", zap.Error(err))
 		// 暂时将错误详情返回给前端以便调试
-		utils.InternalServerError(c, fmt.Sprintf("服务器错误: %v", err))
+		utils.InternalServerError(c, "服务器内部错误")
 		return
 		// --- 修改结束 ---
 	}

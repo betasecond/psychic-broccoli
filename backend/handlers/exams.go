@@ -54,6 +54,8 @@ func GetExams(c *gin.Context) {
 	title := c.Query("title")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	userID := currentUserID(c)
+	role := currentUserRole(c)
 
 	offset := (page - 1) * pageSize
 
@@ -64,8 +66,35 @@ func GetExams(c *gin.Context) {
 	`
 	args := []interface{}{}
 
+	switch role {
+	case "STUDENT":
+		query = `
+			SELECT e.id, e.course_id, e.title, e.start_time, e.end_time, e.created_at
+			FROM exams e
+			JOIN course_enrollments ce ON ce.course_id = e.course_id
+			WHERE ce.student_id = ?
+		`
+		args = append(args, userID)
+	case "INSTRUCTOR":
+		query = `
+			SELECT e.id, e.course_id, e.title, e.start_time, e.end_time, e.created_at
+			FROM exams e
+			JOIN courses c ON c.id = e.course_id
+			WHERE c.instructor_id = ?
+		`
+		args = append(args, userID)
+	case "ADMIN":
+	default:
+		utils.Forbidden(c, "权限不足")
+		return
+	}
+
 	if courseID != "" {
-		query += " AND course_id = ?"
+		if role == "ADMIN" {
+			query += " AND course_id = ?"
+		} else {
+			query += " AND e.course_id = ?"
+		}
 		args = append(args, courseID)
 	}
 
@@ -172,8 +201,14 @@ func CreateExam(c *gin.Context) {
 
 // GetExam 获取考试详情
 func GetExam(c *gin.Context) {
-	examID := c.Param("id")
+	examID, ok := parseInt64Param(c, c.Param("id"), "考试ID")
+	if !ok {
+		return
+	}
 	role, _ := c.Get("role")
+	if _, ok := ensureExamAccessible(c, examID, "没有权限访问该考试"); !ok {
+		return
+	}
 
 	var exam models.Exam
 	err := database.DB.QueryRow(`
@@ -484,8 +519,18 @@ func SubmitExam(c *gin.Context) {
 
 // SaveDraft 保存答卷草稿
 func SaveDraft(c *gin.Context) {
-	examID := c.Param("id")
+	examID, ok := parseInt64Param(c, c.Param("id"), "考试ID")
+	if !ok {
+		return
+	}
 	userID, _ := c.Get("userID")
+	if currentUserRole(c) != "STUDENT" {
+		utils.Forbidden(c, "只有学生可以保存考试草稿")
+		return
+	}
+	if _, ok := ensureExamAccessible(c, examID, "没有权限访问该考试"); !ok {
+		return
+	}
 
 	var req SaveDraftRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -552,8 +597,18 @@ func SaveDraft(c *gin.Context) {
 
 // GetDraft 获取答卷草稿
 func GetDraft(c *gin.Context) {
-	examID := c.Param("id")
+	examID, ok := parseInt64Param(c, c.Param("id"), "考试ID")
+	if !ok {
+		return
+	}
 	userID, _ := c.Get("userID")
+	if currentUserRole(c) != "STUDENT" {
+		utils.Forbidden(c, "只有学生可以查看考试草稿")
+		return
+	}
+	if _, ok := ensureExamAccessible(c, examID, "没有权限访问该考试"); !ok {
+		return
+	}
 
 	rows, err := database.DB.Query(`
 		SELECT question_id, answer FROM exam_drafts 

@@ -105,7 +105,13 @@ func GetMyCourses(c *gin.Context) {
 
 // GetCourseStatistics 获取课程统计信息
 func GetCourseStatistics(c *gin.Context) {
-	courseID := c.Param("id")
+	courseID, ok := parseInt64Param(c, c.Param("id"), "课程ID")
+	if !ok {
+		return
+	}
+	if !ensureCourseAccessible(c, courseID, "没有权限访问该课程统计信息") {
+		return
+	}
 
 	// 获取学生人数
 	var studentCount int
@@ -423,6 +429,14 @@ func checkSectionChapterPerm(c *gin.Context, courseIDStr string, chapterID int64
 func GetChapterSections(c *gin.Context) {
 	courseIDStr := c.Param("id")
 	chapterID := c.Param("cid")
+	courseID, err := strconv.ParseInt(courseIDStr, 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "无效的课程ID")
+		return
+	}
+	if !ensureCourseAccessible(c, courseID, "没有权限查看该课程章节内容") {
+		return
+	}
 
 	// 验证章节属于该课程
 	var chapterExists bool

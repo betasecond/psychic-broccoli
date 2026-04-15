@@ -10,7 +10,8 @@ import (
 )
 
 const defaultGenBaseURL = "https://openrouter.ai/api/v1"
-const defaultGenModel = "google/gemini-2.5-flash-preview"
+const defaultGenModel = "google/gemini-2.5-flash"
+const defaultGenMaxTokens = 1024
 
 const systemPrompt = `你是在线教育平台中的课程学习助手。
 请严格只依据提供的课程资料片段回答问题，不要编造资料中没有的信息。
@@ -29,8 +30,9 @@ type GenClient struct {
 }
 
 type chatRequest struct {
-    Model    string        `json:"model"`
-    Messages []ChatMessage `json:"messages"`
+    Model     string        `json:"model"`
+    Messages  []ChatMessage `json:"messages"`
+    MaxTokens int           `json:"max_tokens,omitempty"`
 }
 
 type chatResponse struct {
@@ -82,7 +84,11 @@ func (c *GenClient) generate(messages []ChatMessage) (string, error) {
         model = defaultGenModel
     }
 
-    body, err := json.Marshal(chatRequest{Model: model, Messages: messages})
+    body, err := json.Marshal(chatRequest{
+        Model:     model,
+        Messages:  messages,
+        MaxTokens: defaultGenMaxTokens,
+    })
     if err != nil {
         return "", err
     }

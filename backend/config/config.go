@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"strings"
 )
 
 // Config 应用配置
@@ -20,12 +22,25 @@ func Load() *Config {
 	return &Config{
 		ServerPort:      getEnv("SERVER_PORT", "8080"),
 		DBPath:          getEnv("DB_PATH", "./database/education.db"),
-		JWTSecret:       getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		JWTSecret:       strings.TrimSpace(os.Getenv("JWT_SECRET")),
 		EnableSeed:      getEnvBool("ENABLE_SEED", false),
 		AnthropicAPIKey: getEnv("ANTHROPIC_API_KEY", ""),
 		OpenAIAPIKey:    getEnv("OPENAI_API_KEY", ""),
 		OpenAIBaseURL:   getEnv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
 	}
+}
+
+func (c *Config) Validate() error {
+	if c.JWTSecret == "" {
+		return fmt.Errorf("JWT_SECRET is required")
+	}
+	if len(c.JWTSecret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters")
+	}
+	if c.JWTSecret == "your-secret-key-change-in-production" {
+		return fmt.Errorf("default JWT secret is not allowed")
+	}
+	return nil
 }
 
 // getEnv 获取环境变量,如果不存在则返回默认值

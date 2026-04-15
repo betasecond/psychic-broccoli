@@ -12,8 +12,15 @@ import (
 
 // GetLiveMessages 获取直播聊天消息
 func GetLiveMessages(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "直播ID")
+	if !ok {
+		return
+	}
 	since := c.Query("since") // 获取此时间之后的消息（用于轮询增量获取）
+
+	if _, ok := ensureLiveAccessible(c, liveID, "没有权限查看该直播聊天"); !ok {
+		return
+	}
 
 	query := `
 		SELECT m.id, m.content, m.created_at,
@@ -78,10 +85,17 @@ func GetLiveMessages(c *gin.Context) {
 
 // SendLiveMessage 发送直播聊天消息
 func SendLiveMessage(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "直播ID")
+	if !ok {
+		return
+	}
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(401, gin.H{"error": "未授权"})
+		return
+	}
+
+	if _, ok := ensureLiveAccessible(c, liveID, "没有权限在该直播中发言"); !ok {
 		return
 	}
 
@@ -160,7 +174,13 @@ func SendLiveMessage(c *gin.Context) {
 
 // GetLiveMessageCount 获取直播消息数量
 func GetLiveMessageCount(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "直播ID")
+	if !ok {
+		return
+	}
+	if _, ok := ensureLiveAccessible(c, liveID, "没有权限查看该直播聊天"); !ok {
+		return
+	}
 
 	var count int
 	err := database.DB.QueryRow(
@@ -178,7 +198,10 @@ func GetLiveMessageCount(c *gin.Context) {
 
 // DeleteLiveMessage 删除直播消息（仅讲师和消息发送者可删除）
 func DeleteLiveMessage(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "直播ID")
+	if !ok {
+		return
+	}
 	messageIDStr := c.Param("messageId")
 	messageID, err := strconv.ParseInt(messageIDStr, 10, 64)
 	if err != nil {
@@ -193,6 +216,9 @@ func DeleteLiveMessage(c *gin.Context) {
 	}
 
 	role, _ := c.Get("role")
+	if _, ok := ensureLiveAccessible(c, liveID, "没有权限管理该直播聊天"); !ok {
+		return
+	}
 
 	// 查询消息是否存在以及发送者
 	var msgUserID int64

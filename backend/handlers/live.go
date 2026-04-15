@@ -149,6 +149,8 @@ func CreateLive(c *gin.Context) {
 func GetLiveList(c *gin.Context) {
 	courseID := c.Query("courseId")
 	status := c.Query("status")
+	userID := currentUserID(c)
+	role := currentUserRole(c)
 
 	query := `
 		SELECT ls.id, ls.title, ls.description, ls.status, ls.scheduled_time,
@@ -162,6 +164,19 @@ func GetLiveList(c *gin.Context) {
 	`
 
 	args := []interface{}{}
+
+	switch role {
+	case "STUDENT":
+		query += " AND EXISTS (SELECT 1 FROM course_enrollments ce WHERE ce.course_id = ls.course_id AND ce.student_id = ?)"
+		args = append(args, userID)
+	case "INSTRUCTOR":
+		query += " AND ls.instructor_id = ?"
+		args = append(args, userID)
+	case "ADMIN":
+	default:
+		c.JSON(403, gin.H{"error": "\u6ca1\u6709\u6743\u9650\u8bbf\u95ee\u76f4\u64ad\u5217\u8868"})
+		return
+	}
 
 	if courseID != "" {
 		query += " AND ls.course_id = ?"
@@ -245,7 +260,13 @@ func GetLiveList(c *gin.Context) {
 
 // GetLiveDetail 获取直播详情
 func GetLiveDetail(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "\u76f4\u64adID")
+	if !ok {
+		return
+	}
+	if _, ok := ensureLiveAccessible(c, liveID, "\u6ca1\u6709\u6743\u9650\u67e5\u770b\u8be5\u76f4\u64ad"); !ok {
+		return
+	}
 
 	query := `
 		SELECT ls.id, ls.title, ls.description, ls.stream_name, ls.push_url,
@@ -447,10 +468,16 @@ func EndLive(c *gin.Context) {
 
 // JoinLive 加入直播（记录观看）
 func JoinLive(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "\u76f4\u64adID")
+	if !ok {
+		return
+	}
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(401, gin.H{"error": "未授权"})
+		return
+	}
+	if _, ok := ensureLiveAccessible(c, liveID, "\u6ca1\u6709\u6743\u9650\u52a0\u5165\u8be5\u76f4\u64ad"); !ok {
 		return
 	}
 
@@ -535,7 +562,13 @@ func LeaveLive(c *gin.Context) {
 
 // GetLiveViewers 获取直播观看人数
 func GetLiveViewers(c *gin.Context) {
-	liveID := c.Param("id")
+	liveID, ok := parseInt64Param(c, c.Param("id"), "\u76f4\u64adID")
+	if !ok {
+		return
+	}
+	if _, ok := ensureLiveAccessible(c, liveID, "\u6ca1\u6709\u6743\u9650\u67e5\u770b\u8be5\u76f4\u64ad\u89c2\u770b\u4eba\u6570"); !ok {
+		return
+	}
 
 	var count int
 	err := database.DB.QueryRow(`

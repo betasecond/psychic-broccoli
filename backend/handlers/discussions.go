@@ -134,6 +134,8 @@ func GetDiscussions(c *gin.Context) {
 	status := c.Query("status")
 	keyword := c.Query("keyword")
 	sort := c.Query("sort") // hot, latest
+	userID := currentUserID(c)
+	role := currentUserRole(c)
 
 	query := `
 		SELECT d.id, d.title, d.content, d.status, d.replies, d.views, d.likes, d.favorites, d.heat_score, d.created_at,
@@ -146,6 +148,19 @@ func GetDiscussions(c *gin.Context) {
 	`
 
 	args := []interface{}{}
+
+	switch role {
+	case "STUDENT":
+		query += " AND EXISTS (SELECT 1 FROM course_enrollments ce WHERE ce.course_id = d.course_id AND ce.student_id = ?)"
+		args = append(args, userID)
+	case "INSTRUCTOR":
+		query += " AND EXISTS (SELECT 1 FROM courses c2 WHERE c2.id = d.course_id AND c2.instructor_id = ?)"
+		args = append(args, userID)
+	case "ADMIN":
+	default:
+		utils.Forbidden(c, "权限不足")
+		return
+	}
 
 	if courseID != "" {
 		query += " AND d.course_id = ?"
@@ -252,14 +267,19 @@ func GetDiscussions(c *gin.Context) {
 
 // GetDiscussionDetail 获取讨论详情（增加浏览量统计）
 func GetDiscussionDetail(c *gin.Context) {
-	discussionID := c.Param("id")
+	discussionID, ok := parseInt64Param(c, c.Param("id"), "讨论ID")
+	if !ok {
+		return
+	}
 	currentUserID, _ := c.Get("userID")
 
 	// 原子更新浏览量
+	if _, ok := ensureDiscussionAccessible(c, discussionID, "没有权限访问该讨论"); !ok {
+		return
+	}
 	database.DB.Exec("UPDATE discussions SET views = views + 1 WHERE id = ?", discussionID)
 	// 异步更新热度
-	dID, _ := strconv.ParseInt(discussionID, 10, 64)
-	go refreshDiscussionHeat(dID)
+	go refreshDiscussionHeat(discussionID)
 
 	query := `
 		SELECT d.id, d.title, d.content, d.status, d.replies, d.views, d.likes, d.created_at,
@@ -407,6 +427,9 @@ func GetDiscussionDetail(c *gin.Context) {
 func ReplyDiscussion(c *gin.Context) {
 	discussionIDStr := c.Param("id")
 	discussionID, _ := strconv.ParseInt(discussionIDStr, 10, 64)
+	if _, ok := ensureDiscussionAccessible(c, discussionID, "没有权限回复该讨论"); !ok {
+		return
+	}
 
 	userID, _ := c.Get("userID")
 
@@ -446,6 +469,9 @@ func ReplyDiscussion(c *gin.Context) {
 func LikeReply(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	replyID, _ := strconv.ParseInt(c.Param("rid"), 10, 64)
+	if _, _, ok := ensureReplyAccessible(c, replyID, "没有权限操作该讨论回复"); !ok {
+		return
+	}
 
 	// 原子操作实现：严禁应用层自增。直接在 SQL 中执行 +1/-1
 	tx, _ := database.DB.Begin()
@@ -492,6 +518,9 @@ func LikeReply(c *gin.Context) {
 func FavoriteReply(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	replyID, _ := strconv.ParseInt(c.Param("rid"), 10, 64)
+	if _, _, ok := ensureReplyAccessible(c, replyID, "没有权限操作该讨论回复"); !ok {
+		return
+	}
 
 	tx, _ := database.DB.Begin()
 	defer tx.Rollback()

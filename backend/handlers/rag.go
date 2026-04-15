@@ -48,38 +48,13 @@ type storedRAGChunk struct {
 }
 
 func isCourseInstructorOrAdmin(c *gin.Context, courseID int64) bool {
-    roleVal, _ := c.Get("role")
-    role, _ := roleVal.(string)
-    if role == "ADMIN" {
-        return true
-    }
-    if role != "INSTRUCTOR" {
-        return false
-    }
-
-    userIDVal, _ := c.Get("userID")
-    userID, _ := userIDVal.(int64)
-
-    var instructorID int64
-    err := database.DB.QueryRow(`SELECT instructor_id FROM courses WHERE id = ?`, courseID).Scan(&instructorID)
-    return err == nil && instructorID == userID
+    ok, err := canManageCourse(c, courseID)
+    return err == nil && ok
 }
 
 func isCourseAccessible(c *gin.Context, courseID int64) bool {
-    if isCourseInstructorOrAdmin(c, courseID) {
-        return true
-    }
-
-    userIDVal, _ := c.Get("userID")
-    userID, _ := userIDVal.(int64)
-
-    var count int
-    database.DB.QueryRow(
-        `SELECT COUNT(*) FROM course_enrollments WHERE course_id = ? AND student_id = ?`,
-        courseID,
-        userID,
-    ).Scan(&count) //nolint:errcheck
-    return count > 0
+    ok, err := canAccessCourse(c, courseID)
+    return err == nil && ok
 }
 
 func getRAGConfig() (apiKey, baseURL, model string, err error) {

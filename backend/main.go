@@ -53,6 +53,9 @@ func main() {
 
 	// 加载配置
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		logger.Fatal("安全配置校验失败", zap.Error(err))
+	}
 
 	// 初始化JWT
 	utils.InitJWT(cfg.JWTSecret)
