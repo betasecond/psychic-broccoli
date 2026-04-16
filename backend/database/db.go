@@ -32,7 +32,7 @@ func InitDB(dbPath string) error {
 	if _, err := otelsql.RegisterDBStatsMetrics(DB, otelsql.WithAttributes(
 		semconv.DBSystemSqlite,
 	)); err != nil {
-		utils.GetLogger().Warn("娉ㄥ唽鏁版嵁搴撴寚鏍囧け璐?, zap.Error(err))
+		utils.GetLogger().Warn("注册数据库指标失败", zap.Error(err))
 	}
 
 	// 娴嬭瘯杩炴帴
@@ -296,7 +296,7 @@ func rebuildDiscussionsTableIfNeeded() error {
 	}
 
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_discussions_status ON discussions(status)`)
-	utils.GetLogger().Info("鉁?discussions 琛ㄩ噸寤哄畬鎴?)
+	utils.GetLogger().Info("discussions table rebuilt")
 	return nil
 }
 
@@ -364,7 +364,7 @@ func rebuildDiscussionRepliesTableIfNeeded() error {
 		return fmt.Errorf("discussion_replies 琛ㄩ噸寤?commit 澶辫触: %v", err)
 	}
 
-	utils.GetLogger().Info("鉁?discussion_replies 琛ㄩ噸寤哄畬鎴?)
+	utils.GetLogger().Info("discussion_replies table rebuilt")
 	return nil
 }
 
@@ -404,7 +404,7 @@ func addColumnIfNotExists(tableName, columnName, columnType string) error {
 		if _, err := DB.Exec(alterSQL); err != nil {
 			return fmt.Errorf("娣诲姞鍒楀け璐? %v", err)
 		}
-		utils.GetLogger().Info("鉁?鎴愬姛娣诲姞鍒?,
+		utils.GetLogger().Info("successfully added column",
 			zap.String("table", tableName),
 			zap.String("column", columnName),
 		)
