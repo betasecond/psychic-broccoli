@@ -182,7 +182,7 @@ const CourseDetailPage: React.FC = () => {
   if (!course) {
     return (
       <div style={{ padding: '24px' }}>
-        <Card><Text>璇剧▼涓嶅瓨鍦?/Text></Card>
+        <Card><Text>课程不存在</Text></Card>
       </div>
     );
   }
@@ -265,7 +265,7 @@ ${src.content}`}
           <TextArea
             value={question}
             onChange={e => setQuestion(e.target.value)}
-            placeholder="杈撳叆闂锛屾寜 Ctrl+Enter 鍙戦€?
+            placeholder="输入问题，按 Ctrl+Enter 发送"
             autoSize={{ minRows: 2, maxRows: 4 }}
             onKeyDown={e => {
               if (e.key === 'Enter' && e.ctrlKey) {
@@ -353,14 +353,14 @@ ${src.content}`}
                   <Title level={2} style={{ margin: 0 }}>{course.title}</Title>
                 </Space>
                 <div style={{ marginTop: '12px' }}>
-                  <Text type="secondary">鎺堣鏁欏笀锛?/Text>
+                  <Text type="secondary">授课教师：</Text>
                   <Text strong>{course.instructorName}</Text>
                 </div>
               </div>
 
               {/* 璇剧▼绠€浠?*/}
               <div>
-                <Title level={4}>璇剧▼绠€浠?/Title>
+                <Title level={4}>课程简介</Title>
                 <Paragraph>{course.description || '鏆傛棤璇剧▼鎻忚堪'}</Paragraph>
               </div>
 
@@ -410,9 +410,9 @@ ${src.content}`}
                                       {isCompleted
                                         ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
                                         : <FolderOpenOutlined style={{ color: '#1890ff' }} />}
-                                      <Text strong>绗?{chapter.orderIndex} 绔?/Text>
+                                      <Text strong>第 {chapter.orderIndex} 章</Text>
                                       <Text>{chapter.title}</Text>
-                                      {isCompleted && <Tag color="green">宸插畬鎴?/Tag>}
+                                      {isCompleted && <Tag color="green">已完成</Tag>}
                                       {chSections.length > 0 && (
                                         <Tag color="default">{chSections.length} 璇炬椂</Tag>
                                       )}
@@ -428,13 +428,13 @@ ${src.content}`}
                                         onClick={() => handleCompleteChapter(chapter.id)}
                                         disabled={isCompleted}
                                       >
-                                        {isCompleted ? '宸插畬鎴? : '鏍囪瀹屾垚'}
+                                        {isCompleted ? '已完成' : '标记完成'}
                                       </Button>
                                     </span>
                                   }
                                 >
                                   {chSections.length === 0 ? (
-                                    <Text type="secondary" style={{ paddingLeft: 8 }}>鏈珷鑺傛殏鏃犺鏃?/Text>
+                                    <Text type="secondary" style={{ paddingLeft: 8 }}>本章节暂无课时</Text>
                                   ) : (
                                     <List
                                       size="small"
@@ -467,7 +467,7 @@ ${src.content}`}
                                       <Title level={5} style={{ marginTop: 0 }}>{activeSection.title}</Title>
                                       {activeSection.type === 'VIDEO' && activeSection.videoUrl ? (
                                         <div>
-                                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>瑙嗛閾炬帴锛?/Text>
+                                          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>视频链接：</Text>
                                           <a href={activeSection.videoUrl} target="_blank" rel="noopener noreferrer">
                                             {activeSection.videoUrl}
                                           </a>
@@ -569,12 +569,12 @@ ${src.content}`}
                 <div>
                   {course.categoryName
                     ? <Tag color="blue">{course.categoryName}</Tag>
-                    : <Text type="secondary">鏈垎绫?/Text>}
+                    : <Text type="secondary">未分类</Text>}
                 </div>
               </div>
 
               <div>
-                <Text type="secondary">鐘舵€?/Text>
+                <Text type="secondary">状态</Text>
                 <div>
                   <Tag color={course.status === 'PUBLISHED' ? 'green' : 'orange'}>{course.status}</Tag>
                 </div>
