@@ -128,11 +128,11 @@ func loadRecentRAGHistory(courseID, userID int64, sessionID string, limit int) (
 
 func fetchCourseChunks(courseID int64) ([]storedRAGChunk, error) {
     rows, err := database.DB.Query(
-        `SELECT c.id, c.doc_id, c.chunk_index, c.content, c.embedding, d.filename
+        `SELECT c.id, c.doc_id, COALESCE(c.chunk_index, 0), c.content, c.embedding, d.filename
          FROM rag_chunks c
          JOIN rag_documents d ON d.id = c.doc_id
-         WHERE c.course_id = ? AND c.embedding IS NOT NULL AND c.embedding != ''
-         ORDER BY c.doc_id ASC, c.chunk_index ASC`,
+         WHERE COALESCE(c.course_id, d.course_id) = ? AND c.embedding IS NOT NULL AND c.embedding != ''
+         ORDER BY c.doc_id ASC, COALESCE(c.chunk_index, c.id) ASC`,
         courseID,
     )
     if err != nil {
@@ -203,7 +203,7 @@ func loadSourcesByChunkIDs(chunkIDs []int64) ([]ragSource, error) {
 
     rows, err := database.DB.Query(
         fmt.Sprintf(
-            `SELECT c.id, c.doc_id, d.filename, c.chunk_index, c.content
+            `SELECT c.id, c.doc_id, d.filename, COALESCE(c.chunk_index, 0), c.content
              FROM rag_chunks c
              JOIN rag_documents d ON d.id = c.doc_id
              WHERE c.id IN (%s)`,
@@ -361,11 +361,16 @@ func ListRAGDocuments(c *gin.Context) {
     }
 
     rows, err := database.DB.Query(
-        `SELECT d.id, d.filename, d.char_count, d.chunk_count, d.created_at, u.username
+        `SELECT d.id,
+                d.filename,
+                COALESCE(d.char_count, 0),
+                COALESCE(d.chunk_count, 0),
+                COALESCE(strftime('%Y-%m-%dT%H:%M:%SZ', d.created_at), ''),
+                COALESCE(u.username, '')
          FROM rag_documents d
-         JOIN users u ON u.id = d.created_by
+         LEFT JOIN users u ON u.id = d.created_by
          WHERE d.course_id = ?
-         ORDER BY d.created_at DESC`,
+         ORDER BY COALESCE(d.created_at, '1970-01-01 00:00:00') DESC, d.id DESC`,
         courseID,
     )
     if err != nil {
@@ -386,11 +391,9 @@ func ListRAGDocuments(c *gin.Context) {
     result := make([]item, 0)
     for rows.Next() {
         var doc item
-        var createdAt time.Time
-        if err := rows.Scan(&doc.ID, &doc.Filename, &doc.CharCount, &doc.ChunkCount, &createdAt, &doc.CreatedBy); err != nil {
+        if err := rows.Scan(&doc.ID, &doc.Filename, &doc.CharCount, &doc.ChunkCount, &doc.CreatedAt, &doc.CreatedBy); err != nil {
             continue
         }
-        doc.CreatedAt = createdAt.Format(time.RFC3339)
         result = append(result, doc)
     }
 

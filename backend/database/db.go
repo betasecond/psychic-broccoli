@@ -194,7 +194,28 @@ func autoMigrate() error {
 	`); err != nil {
 		return fmt.Errorf("创建 rag_queries 表失败: %v", err)
 	}
+	if err := addColumnIfNotExists("rag_documents", "char_count", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_documents", "chunk_count", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_documents", "created_by", "INTEGER"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_documents", "created_at", "DATETIME"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_chunks", "course_id", "INTEGER"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_chunks", "chunk_index", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_chunks", "embedding", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_chunks", "created_at", "DATETIME"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_queries", "answer", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_queries", "source_chunks", "TEXT"); err != nil { return err }
 	if err := addColumnIfNotExists("rag_queries", "session_id", "TEXT"); err != nil { return err }
+	if _, err := DB.Exec(`
+		UPDATE rag_chunks
+		SET course_id = (
+			SELECT d.course_id
+			FROM rag_documents d
+			WHERE d.id = rag_chunks.doc_id
+		)
+		WHERE course_id IS NULL OR course_id = 0
+	`); err != nil {
+		return fmt.Errorf("鍥炲～ rag_chunks.course_id 澶辫触: %v", err)
+	}
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_documents_course_id ON rag_documents(course_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_chunks_doc_id       ON rag_chunks(doc_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_rag_chunks_course_id    ON rag_chunks(course_id)`)
