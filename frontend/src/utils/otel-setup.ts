@@ -8,17 +8,16 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
 export const initFrontendTracer = () => {
-  const provider = new WebTracerProvider({
-    resource: resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: 'courseark-frontend',
-    }),
-  });
-
   const exporter = new OTLPTraceExporter({
     url: `${window.location.protocol}//${window.location.host}/api/v1/otel/traces`,
   });
 
-  provider.addSpanProcessor(new BatchSpanProcessor(exporter));
+  const provider = new WebTracerProvider({
+    resource: resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: 'courseark-frontend',
+    }),
+    spanProcessors: [new BatchSpanProcessor(exporter)],
+  });
 
   provider.register();
 

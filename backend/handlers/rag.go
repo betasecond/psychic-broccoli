@@ -68,6 +68,10 @@ func getRAGConfig() (apiKey, baseURL, model string, err error) {
     return apiKey, baseURL, model, nil
 }
 
+func getEmbeddingModel() string {
+    return strings.TrimSpace(os.Getenv("EMBEDDING_MODEL"))
+}
+
 func getCurrentUserID(c *gin.Context) int64 {
     userIDVal, _ := c.Get("userID")
     userID, _ := userIDVal.(int64)
@@ -298,7 +302,7 @@ func UploadRAGDocument(c *gin.Context) {
         chunks = chunks[:ragMaxChunks]
     }
 
-    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL, Model: getEmbeddingModel()}
     embeddings, err := embedClient.Embed(chunks)
     if err != nil {
         utils.GetLogger().Error("rag embedding failed", zap.Error(err))
@@ -481,7 +485,7 @@ func QueryRAGExtended(c *gin.Context) {
         return
     }
 
-    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL}
+    embedClient := &ragpkg.EmbedClient{APIKey: apiKey, BaseURL: baseURL, Model: getEmbeddingModel()}
     queryEmbeddings, err := embedClient.Embed([]string{req.Question})
     if err != nil || len(queryEmbeddings) == 0 || len(queryEmbeddings[0]) == 0 {
         if err == nil {
