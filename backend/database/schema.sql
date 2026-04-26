@@ -61,8 +61,9 @@ CREATE TABLE IF NOT EXISTS course_sections (
     chapter_id INTEGER NOT NULL REFERENCES course_chapters(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     order_index INTEGER NOT NULL DEFAULT 0,
-    type TEXT NOT NULL CHECK(type IN ('VIDEO', 'LIVE', 'ASSIGNMENT', 'EXAM')),
+    type TEXT NOT NULL CHECK(type IN ('VIDEO', 'TEXT', 'LIVE', 'ASSIGNMENT', 'EXAM')),
     video_url TEXT,
+    content TEXT,
     resource_id INTEGER
 );
 

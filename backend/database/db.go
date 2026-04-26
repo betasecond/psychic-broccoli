@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/XSAM/otelsql"
 	_ "github.com/mattn/go-sqlite3"
@@ -66,20 +67,41 @@ func autoMigrate() error {
 	if err := addColumnIfNotExists("assignments", "attachments", "TEXT"); err != nil {
 		return err
 	}
+	if err := rebuildCourseSectionsTableIfNeeded(); err != nil {
+		return err
+	}
 
 	// 2. users 琛?- 蹇呴』鍔犱笂杩欓儴鍒嗘潵淇 full_name 缂哄け闂
-	if err := addColumnIfNotExists("users", "full_name", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("users", "phone", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("users", "gender", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("users", "bio", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("users", "full_name", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("users", "phone", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("users", "gender", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("users", "bio", "TEXT"); err != nil {
+		return err
+	}
 
 	// 3. discussions 琛?- 鏃х増鏈敤 author/course TEXT锛屾柊鐗堟湰闇€瑕?author_id/course_id/content
 	// 鍏堣ˉ鍒楋紙鏂板垪涓?nullable锛屼笉浼氱牬鍧忔棫鏁版嵁锛?
-	if err := addColumnIfNotExists("discussions", "author_id", "INTEGER"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "course_id", "INTEGER"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "content", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "last_reply_at", "DATETIME"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "author_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "course_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "content", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "last_reply_at", "DATETIME"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"); err != nil {
+		return err
+	}
 	// 鍐嶉噸寤鸿〃锛岀Щ闄ゆ棫鐨?author/course TEXT NOT NULL 鍒楋紙鍚﹀垯 INSERT 浼氬洜 NOT NULL 绾︽潫澶辫触锛?
 	if err := rebuildDiscussionsTableIfNeeded(); err != nil {
 		return err
@@ -111,10 +133,18 @@ func autoMigrate() error {
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_reply_likes_user_id  ON reply_likes(user_id)`)
 
 	// 6. discussions 琛?- 琛ュ厖绀句氦鍔熻兘鍒楋紙views/likes/favorites/heat_score锛?
-	if err := addColumnIfNotExists("discussions", "views", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "likes", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "favorites", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("discussions", "heat_score", "REAL NOT NULL DEFAULT 0"); err != nil { return err }
+	if err := addColumnIfNotExists("discussions", "views", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "likes", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "favorites", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("discussions", "heat_score", "REAL NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
 
 	// 6b. reply_favorites 琛?
 	if _, err := DB.Exec(`
@@ -153,7 +183,7 @@ func autoMigrate() error {
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_user_id ON ai_corrections(user_id)`)
 	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_corrections_exam_id ON ai_corrections(exam_id)`)
 
-		// 8. RAG knowledge base tables.
+	// 8. RAG knowledge base tables.
 	if _, err := DB.Exec(`
 		CREATE TABLE IF NOT EXISTS rag_documents (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -194,17 +224,39 @@ func autoMigrate() error {
 	`); err != nil {
 		return fmt.Errorf("创建 rag_queries 表失败: %v", err)
 	}
-	if err := addColumnIfNotExists("rag_documents", "char_count", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_documents", "chunk_count", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_documents", "created_by", "INTEGER"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_documents", "created_at", "DATETIME"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_chunks", "course_id", "INTEGER"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_chunks", "chunk_index", "INTEGER NOT NULL DEFAULT 0"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_chunks", "embedding", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_chunks", "created_at", "DATETIME"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_queries", "answer", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_queries", "source_chunks", "TEXT"); err != nil { return err }
-	if err := addColumnIfNotExists("rag_queries", "session_id", "TEXT"); err != nil { return err }
+	if err := addColumnIfNotExists("rag_documents", "char_count", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_documents", "chunk_count", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_documents", "created_by", "INTEGER"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_documents", "created_at", "DATETIME"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_chunks", "course_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_chunks", "chunk_index", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_chunks", "embedding", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_chunks", "created_at", "DATETIME"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_queries", "answer", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_queries", "source_chunks", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfNotExists("rag_queries", "session_id", "TEXT"); err != nil {
+		return err
+	}
 	if _, err := DB.Exec(`
 		UPDATE rag_chunks
 		SET course_id = (
@@ -246,8 +298,82 @@ func tableColumns(tableName string) (map[string]bool, error) {
 	return cols, nil
 }
 
-// rebuildDiscussionsTableIfNeeded 褰?discussions 琛ㄤ粛鏈夋棫 schema 鐨?author/course TEXT NOT NULL
-// 鍒楁椂锛岀敤 SQLite 鎺ㄨ崘鐨?寤轰复鏃惰〃 鈫?杩佺Щ 鈫?鍒犳棫琛?鈫?鏀瑰悕"鏂瑰紡閲嶅缓锛岄伩鍏?INSERT NOT NULL 鎶ラ敊銆?
+// rebuildCourseSectionsTableIfNeeded keeps existing SQLite databases compatible
+// with text sections and the content column used by course section handlers.
+func rebuildCourseSectionsTableIfNeeded() error {
+	cols, err := tableColumns("course_sections")
+	if err != nil {
+		return err
+	}
+
+	var createSQL string
+	_ = DB.QueryRow(`SELECT COALESCE(sql, '') FROM sqlite_master WHERE type = 'table' AND name = 'course_sections'`).Scan(&createSQL)
+	if cols["content"] && cols["resource_id"] && strings.Contains(createSQL, "'TEXT'") {
+		return nil
+	}
+
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS course_sections_new (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			chapter_id INTEGER NOT NULL REFERENCES course_chapters(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			order_index INTEGER NOT NULL DEFAULT 0,
+			type TEXT NOT NULL CHECK(type IN ('VIDEO', 'TEXT', 'LIVE', 'ASSIGNMENT', 'EXAM')),
+			video_url TEXT,
+			content TEXT,
+			resource_id INTEGER
+		)
+	`); err != nil {
+		return fmt.Errorf("create course_sections_new failed: %v", err)
+	}
+
+	contentExpr := "''"
+	if cols["content"] {
+		contentExpr = "COALESCE(content, '')"
+	}
+	resourceExpr := "NULL"
+	if cols["resource_id"] {
+		resourceExpr = "resource_id"
+	}
+	insertSQL := fmt.Sprintf(`
+		INSERT INTO course_sections_new
+			(id, chapter_id, title, order_index, type, video_url, content, resource_id)
+		SELECT
+			id,
+			chapter_id,
+			COALESCE(title, ''),
+			COALESCE(order_index, 0),
+			CASE WHEN type = 'TEXT' THEN 'TEXT' ELSE COALESCE(type, 'VIDEO') END,
+			video_url,
+			%s,
+			%s
+		FROM course_sections
+	`, contentExpr, resourceExpr)
+	if _, err := tx.Exec(insertSQL); err != nil {
+		return fmt.Errorf("migrate course_sections data failed: %v", err)
+	}
+
+	if _, err := tx.Exec(`DROP TABLE course_sections`); err != nil {
+		return fmt.Errorf("drop old course_sections failed: %v", err)
+	}
+	if _, err := tx.Exec(`ALTER TABLE course_sections_new RENAME TO course_sections`); err != nil {
+		return fmt.Errorf("rename course_sections_new failed: %v", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_sections_chapter_id ON course_sections(chapter_id)`); err != nil {
+		return fmt.Errorf("create course_sections index failed: %v", err)
+	}
+
+	return tx.Commit()
+}
+
+// rebuildDiscussionsTableIfNeeded rebuilds older discussion tables that still
+// contain legacy author/course text columns.
 func rebuildDiscussionsTableIfNeeded() error {
 	cols, err := tableColumns("discussions")
 	if err != nil {
@@ -441,4 +567,3 @@ func CloseDB() error {
 	}
 	return nil
 }
-

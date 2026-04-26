@@ -29,10 +29,13 @@ services:
       - "JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}"
       - GIN_MODE=release
       - ENABLE_SEED=${ENABLE_SEED:-false}
+      - "RAG_PROVIDER=${RAG_PROVIDER:-openrouter}"
       - "OPENAI_API_KEY=${OPENAI_API_KEY:-}"
       - "OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
       - "LLM_MODEL=${LLM_MODEL:-google/gemini-2.5-flash}"
       - "EMBEDDING_MODEL=${EMBEDDING_MODEL:-openai/text-embedding-3-small}"
+      - "DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}"
+      - "EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-}"
     volumes:
       # Persist SQLite database
       - sqlite_data:/data
