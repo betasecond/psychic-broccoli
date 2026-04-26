@@ -21,10 +21,9 @@ func CORSMiddleware() gin.HandlerFunc {
 		"http://web.courseark.online",
 	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Request-ID", "traceparent", "tracestate"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization", "X-Request-ID", "X-RAG-API-Key", "X-RAG-Provider", "traceparent", "tracestate"}
 	config.ExposeHeaders = []string{"Content-Length"}
 	config.AllowCredentials = true
 
 	return cors.New(config)
 }
-

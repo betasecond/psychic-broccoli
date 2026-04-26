@@ -51,6 +51,15 @@ type storedRAGChunk struct {
 	Filename   string
 }
 
+type ragConfig struct {
+	APIKey             string
+	BaseURL            string
+	LLMModel           string
+	EmbeddingModel     string
+	EmbeddingBatchSize int
+	Provider           string
+}
+
 func isCourseInstructorOrAdmin(c *gin.Context, courseID int64) bool {
 	ok, err := canManageCourse(c, courseID)
 	return err == nil && ok
@@ -61,37 +70,52 @@ func isCourseAccessible(c *gin.Context, courseID int64) bool {
 	return err == nil && ok
 }
 
-func getRAGConfig() (apiKey, baseURL, model string, err error) {
-	useDashScope := shouldUseDashScope()
-	if useDashScope {
-		apiKey = strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
+func getRAGConfig(c *gin.Context) (ragConfig, error) {
+	cfg := ragConfig{Provider: getRAGProvider(c)}
+	useDashScope := providerIsDashScope(cfg.Provider)
+
+	cfg.APIKey = strings.TrimSpace(c.GetHeader("X-RAG-API-Key"))
+	if cfg.APIKey == "" && useDashScope {
+		cfg.APIKey = strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
 	}
-	if apiKey == "" {
-		apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	if cfg.APIKey == "" {
+		cfg.APIKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
 	}
-	if apiKey == "" {
-		apiKey = strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
+	if cfg.APIKey == "" {
+		cfg.APIKey = strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY"))
 	}
-	if apiKey == "" {
-		return "", "", "", fmt.Errorf("缺少 OPENAI_API_KEY 或 DASHSCOPE_API_KEY 配置，无法执行 RAG 向量化或问答")
+	if cfg.APIKey == "" {
+		return cfg, fmt.Errorf("缺少 RAG API Key，请在页面中输入个人 Key，或配置 OPENAI_API_KEY / DASHSCOPE_API_KEY")
 	}
 
-	baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
-	if (baseURL == "" || useDashScope) && strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")) != "" {
-		baseURL = dashScopeCompatibleBaseURL
+	cfg.BaseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
+	if useDashScope {
+		cfg.BaseURL = dashScopeCompatibleBaseURL
 	}
-	model = strings.TrimSpace(os.Getenv("LLM_MODEL"))
-	if (model == "" || useDashScope) && strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")) != "" {
-		model = dashScopeDefaultLLMModel
+	cfg.LLMModel = strings.TrimSpace(os.Getenv("LLM_MODEL"))
+	if useDashScope {
+		cfg.LLMModel = dashScopeDefaultLLMModel
 	}
-	return apiKey, baseURL, model, nil
+	cfg.EmbeddingModel = strings.TrimSpace(os.Getenv("EMBEDDING_MODEL"))
+	if useDashScope {
+		cfg.EmbeddingModel = dashScopeDefaultEmbedModel
+	}
+	cfg.EmbeddingBatchSize = getEmbeddingBatchSize(useDashScope)
+	return cfg, nil
 }
 
-func shouldUseDashScope() bool {
-	provider := strings.ToLower(strings.TrimSpace(os.Getenv("RAG_PROVIDER")))
+func getRAGProvider(c *gin.Context) string {
+	provider := strings.ToLower(strings.TrimSpace(c.GetHeader("X-RAG-Provider")))
+	if provider == "" {
+		provider = strings.ToLower(strings.TrimSpace(os.Getenv("RAG_PROVIDER")))
+	}
 	if provider == "" {
 		provider = strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER")))
 	}
+	return provider
+}
+
+func providerIsDashScope(provider string) bool {
 	switch provider {
 	case "aliyun", "ali", "alibaba", "dashscope", "bailian":
 		return true
@@ -100,22 +124,14 @@ func shouldUseDashScope() bool {
 	}
 }
 
-func getEmbeddingModel() string {
-	model := strings.TrimSpace(os.Getenv("EMBEDDING_MODEL"))
-	if (model == "" || shouldUseDashScope()) && strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")) != "" {
-		return dashScopeDefaultEmbedModel
-	}
-	return model
-}
-
-func getEmbeddingBatchSize() int {
+func getEmbeddingBatchSize(useDashScope bool) int {
 	raw := strings.TrimSpace(os.Getenv("EMBEDDING_BATCH_SIZE"))
 	if raw != "" {
 		if size, err := strconv.Atoi(raw); err == nil && size > 0 {
 			return size
 		}
 	}
-	if strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")) != "" && shouldUseDashScope() {
+	if useDashScope {
 		return dashScopeEmbedBatchSize
 	}
 	return 0
@@ -317,7 +333,7 @@ func UploadRAGDocument(c *gin.Context) {
 		return
 	}
 
-	apiKey, baseURL, _, cfgErr := getRAGConfig()
+	ragCfg, cfgErr := getRAGConfig(c)
 	if cfgErr != nil {
 		utils.InternalServerError(c, cfgErr.Error())
 		return
@@ -352,10 +368,10 @@ func UploadRAGDocument(c *gin.Context) {
 	}
 
 	embedClient := &ragpkg.EmbedClient{
-		APIKey:    apiKey,
-		BaseURL:   baseURL,
-		Model:     getEmbeddingModel(),
-		BatchSize: getEmbeddingBatchSize(),
+		APIKey:    ragCfg.APIKey,
+		BaseURL:   ragCfg.BaseURL,
+		Model:     ragCfg.EmbeddingModel,
+		BatchSize: ragCfg.EmbeddingBatchSize,
 	}
 	embeddings, err := embedClient.Embed(chunks)
 	if err != nil {
@@ -516,7 +532,7 @@ func QueryRAGExtended(c *gin.Context) {
 		return
 	}
 
-	apiKey, baseURL, model, cfgErr := getRAGConfig()
+	ragCfg, cfgErr := getRAGConfig(c)
 	if cfgErr != nil {
 		utils.InternalServerError(c, cfgErr.Error())
 		return
@@ -540,10 +556,10 @@ func QueryRAGExtended(c *gin.Context) {
 	}
 
 	embedClient := &ragpkg.EmbedClient{
-		APIKey:    apiKey,
-		BaseURL:   baseURL,
-		Model:     getEmbeddingModel(),
-		BatchSize: getEmbeddingBatchSize(),
+		APIKey:    ragCfg.APIKey,
+		BaseURL:   ragCfg.BaseURL,
+		Model:     ragCfg.EmbeddingModel,
+		BatchSize: ragCfg.EmbeddingBatchSize,
 	}
 	queryEmbeddings, err := embedClient.Embed([]string{req.Question})
 	if err != nil || len(queryEmbeddings) == 0 || len(queryEmbeddings[0]) == 0 {
@@ -584,7 +600,7 @@ func QueryRAGExtended(c *gin.Context) {
 		utils.GetLogger().Warn("failed to load rag history", zap.Error(err))
 	}
 
-	genClient := &ragpkg.GenClient{APIKey: apiKey, BaseURL: baseURL, Model: model}
+	genClient := &ragpkg.GenClient{APIKey: ragCfg.APIKey, BaseURL: ragCfg.BaseURL, Model: ragCfg.LLMModel}
 	answer, err := genClient.GenerateWithHistory(req.Question, contexts, history)
 	if err != nil {
 		utils.GetLogger().Error("rag generation failed", zap.Error(err))

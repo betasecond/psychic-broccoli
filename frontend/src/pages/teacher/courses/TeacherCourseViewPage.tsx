@@ -1,17 +1,42 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Card, Row, Col, Typography, Space, Spin, Tag, Button,
-  Collapse, List, Statistic, Divider, message, Badge,
-  Upload, Table, Popconfirm,
+  Card,
+  Row,
+  Col,
+  Typography,
+  Space,
+  Spin,
+  Tag,
+  Button,
+  Collapse,
+  List,
+  Statistic,
+  Divider,
+  message,
+  Badge,
+  Upload,
+  Table,
+  Popconfirm,
 } from 'antd'
 import {
-  ArrowLeftOutlined, EditOutlined, BookOutlined,
-  PlayCircleOutlined, FileTextOutlined, TeamOutlined,
-  FolderOpenOutlined, BarChartOutlined, FileOutlined,
-  DownOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  UploadOutlined, DeleteOutlined, DatabaseOutlined,
+  ArrowLeftOutlined,
+  EditOutlined,
+  BookOutlined,
+  PlayCircleOutlined,
+  FileTextOutlined,
+  TeamOutlined,
+  FolderOpenOutlined,
+  BarChartOutlined,
+  FileOutlined,
+  DownOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  UploadOutlined,
+  DeleteOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
+import RagApiKeyControl from '@/components/RagApiKeyControl'
 import { courseService, type CourseSection } from '@/services/courseService'
 import ragService, { type RagDocument } from '@/services/ragService'
 
@@ -43,7 +68,9 @@ const TeacherCourseViewPage: React.FC = () => {
         ])
         setCourse(courseRes)
         const chData = chaptersRes as any
-        const chapterList = Array.isArray(chData) ? chData : (chData?.chapters || [])
+        const chapterList = Array.isArray(chData)
+          ? chData
+          : chData?.chapters || []
         setChapters(chapterList)
         setStats((statsRes as any)?.data || statsRes)
 
@@ -51,8 +78,11 @@ const TeacherCourseViewPage: React.FC = () => {
         const map: Record<number, CourseSection[]> = {}
         await Promise.all(
           chapterList.map(async (ch: any) => {
-            try { map[ch.id] = await courseService.getSections(courseId, ch.id) }
-            catch { map[ch.id] = [] }
+            try {
+              map[ch.id] = await courseService.getSections(courseId, ch.id)
+            } catch {
+              map[ch.id] = []
+            }
           })
         )
         setSections(map)
@@ -113,25 +143,42 @@ const TeacherCourseViewPage: React.FC = () => {
   if (!course) {
     return (
       <div style={{ padding: 24 }}>
-        <Card><Text>课程不存在或无权限查看</Text></Card>
+        <Card>
+          <Text>课程不存在或无权限查看</Text>
+        </Card>
       </div>
     )
   }
 
   const statusMap: Record<string, { color: string; label: string }> = {
     PUBLISHED: { color: 'green', label: '已发布' },
-    DRAFT:     { color: 'orange', label: '草稿' },
-    ARCHIVED:  { color: 'default', label: '已归档' },
+    DRAFT: { color: 'orange', label: '草稿' },
+    ARCHIVED: { color: 'default', label: '已归档' },
   }
   const statusInfo = statusMap[course.status] || statusMap.DRAFT
 
-  const totalSections = chapters.reduce((s, ch) => s + (sections[ch.id]?.length || 0), 0)
+  const totalSections = chapters.reduce(
+    (s, ch) => s + (sections[ch.id]?.length || 0),
+    0
+  )
 
   return (
     <div style={{ padding: 24 }}>
       {/* 顶部返回 + 操作栏 */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/teacher/courses')}>
+      <div
+        style={{
+          marginBottom: 24,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
+      >
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/teacher/courses')}
+        >
           返回课程列表
         </Button>
         <Space wrap>
@@ -157,14 +204,24 @@ const TeacherCourseViewPage: React.FC = () => {
                     <img
                       src={course.coverImageUrl}
                       alt="课程封面"
-                      style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                      style={{
+                        width: 120,
+                        height: 80,
+                        objectFit: 'cover',
+                        borderRadius: 6,
+                        flexShrink: 0,
+                      }}
                     />
                   )}
                   <div>
-                    <Title level={3} style={{ marginBottom: 4, marginTop: 0 }}>{course.title}</Title>
+                    <Title level={3} style={{ marginBottom: 4, marginTop: 0 }}>
+                      {course.title}
+                    </Title>
                     <Space wrap>
                       <Tag color={statusInfo.color}>{statusInfo.label}</Tag>
-                      {course.categoryName && <Tag color="blue">{course.categoryName}</Tag>}
+                      {course.categoryName && (
+                        <Tag color="blue">{course.categoryName}</Tag>
+                      )}
                     </Space>
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary">授课教师：</Text>
@@ -179,7 +236,9 @@ const TeacherCourseViewPage: React.FC = () => {
                   <Divider style={{ margin: '8px 0' }} />
                   <div>
                     <Text strong>课程简介</Text>
-                    <Paragraph style={{ marginTop: 8, marginBottom: 0, color: '#666' }}>
+                    <Paragraph
+                      style={{ marginTop: 8, marginBottom: 0, color: '#666' }}
+                    >
                       {course.description}
                     </Paragraph>
                   </div>
@@ -189,19 +248,35 @@ const TeacherCourseViewPage: React.FC = () => {
           </Card>
 
           {/* 章节与课时结构 */}
-          <Card title={
-            <Space>
-              <FolderOpenOutlined />
-              <span>课程内容</span>
-              <Badge count={chapters.length} color="#1890ff" />
-              <Text type="secondary" style={{ fontSize: 13 }}>（共 {totalSections} 课时）</Text>
-            </Space>
-          }>
+          <Card
+            title={
+              <Space>
+                <FolderOpenOutlined />
+                <span>课程内容</span>
+                <Badge count={chapters.length} color="#1890ff" />
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  （共 {totalSections} 课时）
+                </Text>
+              </Space>
+            }
+          >
             {chapters.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                <FolderOpenOutlined style={{ fontSize: 36, marginBottom: 12 }} />
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '40px 0',
+                  color: '#999',
+                }}
+              >
+                <FolderOpenOutlined
+                  style={{ fontSize: 36, marginBottom: 12 }}
+                />
                 <p>暂无章节，请前往"编辑课程"添加</p>
-                <Button type="primary" ghost onClick={() => navigate(`/teacher/courses/${courseId}/edit`)}>
+                <Button
+                  type="primary"
+                  ghost
+                  onClick={() => navigate(`/teacher/courses/${courseId}/edit`)}
+                >
                   去添加章节
                 </Button>
               </div>
@@ -209,7 +284,9 @@ const TeacherCourseViewPage: React.FC = () => {
               <Collapse
                 accordion={false}
                 defaultActiveKey={chapters.slice(0, 1).map((ch: any) => ch.id)}
-                expandIcon={({ isActive }) => <DownOutlined rotate={isActive ? 180 : 0} />}
+                expandIcon={({ isActive }) => (
+                  <DownOutlined rotate={isActive ? 180 : 0} />
+                )}
               >
                 {chapters.map((chapter: any) => {
                   const chSections = sections[chapter.id] || []
@@ -230,18 +307,37 @@ const TeacherCourseViewPage: React.FC = () => {
                       }
                     >
                       {chSections.length === 0 ? (
-                        <Text type="secondary" style={{ paddingLeft: 8 }}>本章节暂无课时</Text>
+                        <Text type="secondary" style={{ paddingLeft: 8 }}>
+                          本章节暂无课时
+                        </Text>
                       ) : (
                         <List
                           size="small"
                           dataSource={chSections}
-                          renderItem={(sec) => (
-                            <List.Item key={sec.id} style={{ padding: '8px 12px' }}>
+                          renderItem={sec => (
+                            <List.Item
+                              key={sec.id}
+                              style={{ padding: '8px 12px' }}
+                            >
                               <List.Item.Meta
                                 avatar={
-                                  sec.type === 'VIDEO'
-                                    ? <Tag icon={<PlayCircleOutlined />} color="blue" style={{ marginRight: 0 }}>视频</Tag>
-                                    : <Tag icon={<FileTextOutlined />} color="green" style={{ marginRight: 0 }}>图文</Tag>
+                                  sec.type === 'VIDEO' ? (
+                                    <Tag
+                                      icon={<PlayCircleOutlined />}
+                                      color="blue"
+                                      style={{ marginRight: 0 }}
+                                    >
+                                      视频
+                                    </Tag>
+                                  ) : (
+                                    <Tag
+                                      icon={<FileTextOutlined />}
+                                      color="green"
+                                      style={{ marginRight: 0 }}
+                                    >
+                                      图文
+                                    </Tag>
+                                  )
                                 }
                                 title={
                                   <Text style={{ fontSize: 14 }}>
@@ -249,15 +345,25 @@ const TeacherCourseViewPage: React.FC = () => {
                                   </Text>
                                 }
                                 description={
-                                  sec.videoUrl
-                                    ? <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {sec.videoUrl.length > 60 ? sec.videoUrl.slice(0, 60) + '...' : sec.videoUrl}
-                                      </Text>
-                                    : sec.content
-                                    ? <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {sec.content.length > 80 ? sec.content.slice(0, 80) + '...' : sec.content}
-                                      </Text>
-                                    : null
+                                  sec.videoUrl ? (
+                                    <Text
+                                      type="secondary"
+                                      style={{ fontSize: 12 }}
+                                    >
+                                      {sec.videoUrl.length > 60
+                                        ? sec.videoUrl.slice(0, 60) + '...'
+                                        : sec.videoUrl}
+                                    </Text>
+                                  ) : sec.content ? (
+                                    <Text
+                                      type="secondary"
+                                      style={{ fontSize: 12 }}
+                                    >
+                                      {sec.content.length > 80
+                                        ? sec.content.slice(0, 80) + '...'
+                                        : sec.content}
+                                    </Text>
+                                  ) : null
                                 }
                               />
                             </List.Item>
@@ -298,13 +404,21 @@ const TeacherCourseViewPage: React.FC = () => {
               </Upload>
             }
           >
+            <RagApiKeyControl />
             <div style={{ marginBottom: 8 }}>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                支持 .txt / .md 格式，上传后自动切块并向量化，供学生在"知识库问答"中使用。
+                支持 .txt / .md
+                格式，上传后自动切块并向量化，供学生在"知识库问答"中使用。
               </Typography.Text>
             </div>
             {ragDocs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: '#999' }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '24px 0',
+                  color: '#999',
+                }}
+              >
                 <DatabaseOutlined style={{ fontSize: 28, marginBottom: 8 }} />
                 <p style={{ margin: 0 }}>暂无文档，请上传课程资料</p>
               </div>
@@ -316,17 +430,35 @@ const TeacherCourseViewPage: React.FC = () => {
                 pagination={false}
                 columns={[
                   { title: '文件名', dataIndex: 'filename', ellipsis: true },
-                  { title: 'Chunks', dataIndex: 'chunk_count', width: 70, align: 'center' as const },
-                  { title: '上传时间', dataIndex: 'created_at', width: 110, render: (v: string) => v?.slice(0, 10) },
                   {
-                    title: '操作', width: 60, align: 'center' as const,
+                    title: 'Chunks',
+                    dataIndex: 'chunk_count',
+                    width: 70,
+                    align: 'center' as const,
+                  },
+                  {
+                    title: '上传时间',
+                    dataIndex: 'created_at',
+                    width: 110,
+                    render: (v: string) => v?.slice(0, 10),
+                  },
+                  {
+                    title: '操作',
+                    width: 60,
+                    align: 'center' as const,
                     render: (_: any, record: RagDocument) => (
                       <Popconfirm
                         title="确认删除该文档及其所有知识块？"
                         onConfirm={() => handleRagDelete(record.id)}
-                        okText="删除" cancelText="取消"
+                        okText="删除"
+                        cancelText="取消"
                       >
-                        <Button type="link" danger size="small" icon={<DeleteOutlined />} />
+                        <Button
+                          type="link"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                        />
                       </Popconfirm>
                     ),
                   },
@@ -388,14 +520,17 @@ const TeacherCourseViewPage: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text type="secondary">学生可见</Text>
-                {course.status === 'PUBLISHED'
-                  ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                  : <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-                }
+                {course.status === 'PUBLISHED' ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ) : (
+                  <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text type="secondary">创建时间</Text>
-                <Text style={{ fontSize: 12 }}>{course.createdAt?.slice(0, 10) || '-'}</Text>
+                <Text style={{ fontSize: 12 }}>
+                  {course.createdAt?.slice(0, 10) || '-'}
+                </Text>
               </div>
             </Space>
           </Card>
