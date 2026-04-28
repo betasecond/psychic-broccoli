@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"io"
 	"regexp"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/online-education-platform/backend/database"
 	"github.com/online-education-platform/backend/utils"
+	"go.uber.org/zap"
 )
 
 // ParsedSection 解析出的课时结构
@@ -39,7 +41,7 @@ var (
 	reTextKeyword = regexp.MustCompile(`(?i)阅读|文档|文字|图文|读|text|doc`)
 )
 
-// ParseCourseOutline 本地规则解析课程大纲文件
+// ParseCourseOutline 优先使用 LLM 解析课程大纲，失败时回退到本地规则解析
 func ParseCourseOutline(c *gin.Context) {
 	courseID := c.Param("id")
 	userID, _ := c.Get("userID")
@@ -90,15 +92,25 @@ func ParseCourseOutline(c *gin.Context) {
 		return
 	}
 
-	chapters := parseOutline(string(content))
+	text := string(content)
+	chapters, llmErr := parseOutlineWithLLM(c, text)
+	parseMode := "llm"
+	fallbackReason := ""
+	if llmErr != nil {
+		utils.GetLogger().Warn("LLM 大纲解析失败，回退到规则解析", zap.Error(llmErr))
+		fallbackReason = llmFallbackReason(llmErr)
+		chapters = parseOutline(text)
+		parseMode = "rule_fallback"
+	}
 	if len(chapters) == 0 {
 		utils.BadRequest(c, "未能识别任何章节，请检查文件格式")
 		return
 	}
 
-	utils.Success(c, gin.H{
+	response := gin.H{
 		"chapters":     chapters,
 		"chapterCount": len(chapters),
+		"parseMode":    parseMode,
 		"sectionCount": func() int {
 			total := 0
 			for _, ch := range chapters {
@@ -106,7 +118,87 @@ func ParseCourseOutline(c *gin.Context) {
 			}
 			return total
 		}(),
-	})
+	}
+	if parseMode == "rule_fallback" && fallbackReason != "" {
+		response["fallbackReason"] = fallbackReason
+	}
+	utils.Success(c, response)
+}
+
+func parseOutlineWithLLM(c *gin.Context, text string) ([]ParsedChapter, error) {
+	systemPrompt := `你是在线教育平台 CourseArk 的课程大纲结构化助手。
+请把用户提供的课程大纲解析为严格 JSON。只输出 JSON，不要输出 Markdown、解释或代码块。
+JSON 格式必须为：
+{
+  "chapters": [
+    {
+      "title": "章节标题",
+      "orderIndex": 1,
+      "sections": [
+        {"title": "课时标题", "orderIndex": 1, "type": "VIDEO"}
+      ]
+    }
+  ]
+}
+要求：
+1. chapters 至少 1 项，title 不得为空。
+2. sections 可以为空；如能识别课时则填入。
+3. type 只能是 VIDEO 或 TEXT。含阅读、文档、文字、图文、text、doc 的课时用 TEXT，其余默认 VIDEO。
+4. orderIndex 从 1 开始连续编号。`
+	userPrompt := "请解析以下课程大纲：\n\n" + text
+
+	raw, err := completeWithConfiguredLLM(c, systemPrompt, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+	jsonText, err := extractJSONObject(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload struct {
+		Chapters []ParsedChapter `json:"chapters"`
+	}
+	if err := json.Unmarshal([]byte(jsonText), &payload); err != nil {
+		return nil, newLLMFallbackError(llmFallbackReasonJSONUnmarshalFailed, err)
+	}
+	return normalizeParsedChapters(payload.Chapters)
+}
+
+func normalizeParsedChapters(chapters []ParsedChapter) ([]ParsedChapter, error) {
+	result := make([]ParsedChapter, 0, len(chapters))
+	for _, chapter := range chapters {
+		chapter.Title = strings.TrimSpace(chapter.Title)
+		if chapter.Title == "" {
+			continue
+		}
+
+		sections := make([]ParsedSection, 0, len(chapter.Sections))
+		for _, section := range chapter.Sections {
+			section.Title = strings.TrimSpace(section.Title)
+			if section.Title == "" {
+				continue
+			}
+			section.Type = strings.ToUpper(strings.TrimSpace(section.Type))
+			if section.Type != "TEXT" && section.Type != "VIDEO" {
+				if reTextKeyword.MatchString(section.Title) {
+					section.Type = "TEXT"
+				} else {
+					section.Type = "VIDEO"
+				}
+			}
+			section.OrderIndex = len(sections) + 1
+			sections = append(sections, section)
+		}
+
+		chapter.OrderIndex = len(result) + 1
+		chapter.Sections = sections
+		result = append(result, chapter)
+	}
+	if len(result) == 0 {
+		return nil, newLLMFallbackError(llmFallbackReasonValidationFailed)
+	}
+	return result, nil
 }
 
 // parseOutline 从文本解析章节与课时

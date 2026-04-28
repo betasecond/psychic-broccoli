@@ -76,15 +76,15 @@ func GetExamStatistics(c *gin.Context) {
 	`, examID).Scan(&passCount)
 
 	statistics := gin.H{
-		"totalStudents":    totalStudents,
-		"participated":     participated,
-		"notParticipated":  totalStudents - participated,
+		"totalStudents":     totalStudents,
+		"participated":      participated,
+		"notParticipated":   totalStudents - participated,
 		"participationRate": 0.0,
-		"avgScore":         nil,
-		"maxScore":         nil,
-		"minScore":         nil,
-		"passCount":        passCount,
-		"passRate":         0.0,
+		"avgScore":          nil,
+		"maxScore":          nil,
+		"minScore":          nil,
+		"passCount":         passCount,
+		"passRate":          0.0,
 	}
 
 	if totalStudents > 0 {
@@ -249,9 +249,10 @@ func GetMyExamSubmission(c *gin.Context) {
 
 		rows.Scan(&questionID, &studentAnswer, &scoreAwarded,
 			&qType, &stem, &options, &answer, &score)
+		answer = normalizeStoredExamAnswer(answer)
 
 		answerItem := gin.H{
-			"questionId":     questionID,
+			"questionId":    questionID,
 			"type":          qType,
 			"stem":          stem,
 			"score":         score,
@@ -362,9 +363,10 @@ func GetExamSubmissionDetail(c *gin.Context) {
 
 		rows.Scan(&questionID, &studentAnswer, &scoreAwarded,
 			&qType, &stem, &options, &answer, &score)
+		answer = normalizeStoredExamAnswer(answer)
 
 		answerItem := gin.H{
-			"questionId":     questionID,
+			"questionId":    questionID,
 			"type":          qType,
 			"stem":          stem,
 			"score":         score,
@@ -383,15 +385,15 @@ func GetExamSubmissionDetail(c *gin.Context) {
 	}
 
 	result := gin.H{
-		"id":         submissionID,
-		"examId":     examID,
-		"examTitle":  examTitle,
-		"courseTitle": courseTitle,
-		"studentId":  studentID,
-		"studentName": studentName,
+		"id":           submissionID,
+		"examId":       examID,
+		"examTitle":    examTitle,
+		"courseTitle":  courseTitle,
+		"studentId":    studentID,
+		"studentName":  studentName,
 		"studentEmail": studentEmail,
-		"submittedAt": submittedAt,
-		"answers":     answers,
+		"submittedAt":  submittedAt,
+		"answers":      answers,
 	}
 
 	if totalScore.Valid {
@@ -614,4 +616,3 @@ func DeleteQuestion(c *gin.Context) {
 
 	utils.SuccessWithMessage(c, "删除成功", nil)
 }
-

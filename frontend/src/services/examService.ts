@@ -1,4 +1,5 @@
 import api from './api'
+import { ragCredentialHeaders } from './ragService'
 
 // 类型定义
 export interface Exam {
@@ -61,6 +62,34 @@ export interface ExamStatistics {
   minScore?: number
   passCount: number
   passRate: number
+}
+
+export interface ParsedExamQuestion {
+  type: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER'
+  stem: string
+  options: string[]
+  answer: string
+  score: number
+  confidence?: number
+  issues: string[]
+}
+
+export interface ParseQuestionsResponse {
+  questions: ParsedExamQuestion[]
+  count: number
+  parseMode: 'llm' | 'rule_fallback'
+  fallbackReason?: string
+}
+
+export interface ConfirmParsedQuestionsRequest {
+  examId: number
+  originalQuestions: ParsedExamQuestion[]
+  confirmedQuestions: ParsedExamQuestion[]
+}
+
+export interface ConfirmParsedQuestionsResponse {
+  inserted: number
+  total: number
 }
 
 export interface CreateExamRequest {
@@ -191,12 +220,22 @@ export const examService = {
   },
 
   // AI解析题目文件
-  async parseQuestionsFromFile(examId: number, file: File): Promise<{ questions: any[]; count: number }> {
+  async parseQuestionsFromFile(examId: number, file: File): Promise<ParseQuestionsResponse> {
     const formData = new FormData()
     formData.append('file', file)
     return api.post(`/exams/${examId}/parse-questions`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...ragCredentialHeaders(),
+      },
     }) as any
+  },
+
+  async confirmParsedQuestions(
+    examId: number,
+    data: ConfirmParsedQuestionsRequest
+  ): Promise<ConfirmParsedQuestionsResponse> {
+    return api.post(`/exams/${examId}/questions/confirm`, data) as any
   },
 }
 

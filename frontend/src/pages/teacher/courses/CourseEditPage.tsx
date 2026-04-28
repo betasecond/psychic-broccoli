@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  Alert,
+  Checkbox,
   Card,
   Row,
   Col,
@@ -33,6 +35,8 @@ import {
   FileTextOutlined,
   DownOutlined,
   RobotOutlined,
+  ReloadOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import type { UploadChangeParam, UploadFile } from 'antd/es/upload'
 import {
@@ -41,7 +45,17 @@ import {
   type CourseChapter,
   type CourseSection,
 } from '@/services/courseService'
+import RagApiKeyControl from '@/components/RagApiKeyControl'
 import { uploadFile } from '@/services/fileService'
+import {
+  countSelectedOutline,
+  getFriendlyOutlineFallbackReason,
+  getOutlineFileValidationError,
+  hasPendingOutlineImport,
+  normalizeParsedOutlineForUI,
+  type ParsedOutlineChapterUI,
+  validateParsedOutlineForImport,
+} from './parsedOutlineHelpers'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -80,61 +94,224 @@ const CourseEditPage: React.FC = () => {
   const [aiModalVisible, setAiModalVisible] = useState(false)
   const [aiParsing, setAiParsing] = useState(false)
   const [aiImporting, setAiImporting] = useState(false)
-  const [parsedChapters, setParsedChapters] = useState<Array<{
-    title: string; orderIndex: number; _saved?: boolean
-    sections: Array<{ title: string; orderIndex: number; type: string }>
-  }>>([])
+  const [parseMode, setParseMode] = useState<'llm' | 'rule_fallback' | null>(null)
+  const [fallbackReason, setFallbackReason] = useState<string | undefined>()
+  const [parsedChapters, setParsedChapters] = useState<ParsedOutlineChapterUI[]>([])
+
+  const resetAiOutlineState = () => {
+    setAiParsing(false)
+    setAiImporting(false)
+    setParseMode(null)
+    setFallbackReason(undefined)
+    setParsedChapters([])
+  }
 
   const handleAiParse = async (file: File) => {
+    const validationError = getOutlineFileValidationError(file)
+    if (validationError) {
+      message.warning(validationError)
+      return Upload.LIST_IGNORE
+    }
+
     setAiParsing(true)
+    setParseMode(null)
+    setFallbackReason(undefined)
     setParsedChapters([])
     try {
       const res = await courseService.parseOutline(courseId, file)
-      setParsedChapters(res.chapters || [])
-      if (!res.chapters?.length) message.warning('未识别到章节，请检查文件格式')
-      else message.success(`识别到 ${res.chapterCount} 个章节，${res.sectionCount} 个课时`)
+      const normalizedChapters = normalizeParsedOutlineForUI(res.chapters || [])
+      setParseMode(res.parseMode)
+      setFallbackReason(res.fallbackReason)
+      setParsedChapters(normalizedChapters)
+      if (!normalizedChapters.length) {
+        message.warning('未识别到章节，请检查文件内容')
+      } else if (res.parseMode === 'rule_fallback') {
+        message.warning(`规则解析完成，共识别 ${res.chapterCount} 个章节`)
+      } else {
+        message.success(`AI 识别到 ${res.chapterCount} 个章节，请确认后导入`)
+      }
+      return false
     } catch (e: any) {
-      message.error(e.response?.data?.message || '解析失败，请检查文件格式')
+      message.error(e.response?.data?.message || '解析失败，请检查文件内容')
     } finally {
       setAiParsing(false)
     }
-    return false // 阻止 antd Upload 自动上传
+    return false // 闃绘 antd Upload 鑷姩涓婁紶
   }
 
   const handleAiBatchImport = async () => {
-    if (!parsedChapters.length) return
+    const validationError = validateParsedOutlineForImport(parsedChapters)
+    if (validationError) {
+      message.warning(validationError)
+      return
+    }
+    if (!hasPendingOutlineImport(parsedChapters)) {
+      message.success('当前没有需要导入的章节')
+      return
+    }
+
     setAiImporting(true)
-    let successChapters = 0
+    let importedChapters = 0
+    let importedSections = 0
+    let stoppedByError = false
+    let hasPartialProgress = false
+
     try {
-      for (const ch of parsedChapters) {
-        const chRes = await courseService.createChapter(courseId, {
-          title: ch.title,
-          orderIndex: chapters.length + successChapters + 1,
-        }) as any
-        const newChapterId = chRes?.id || chRes?.data?.id
-        if (newChapterId && ch.sections.length > 0) {
-          for (const sec of ch.sections) {
-            await courseService.createSection(courseId, newChapterId, {
-              title: sec.title,
-              type: sec.type as any,
-              orderIndex: sec.orderIndex,
-            })
-          }
+      const nextChapters = parsedChapters.map(chapter => ({
+        ...chapter,
+        sections: chapter.sections.map(section => ({ ...section })),
+      }))
+
+      for (let chapterIndex = 0; chapterIndex < nextChapters.length; chapterIndex += 1) {
+        const chapter = nextChapters[chapterIndex]
+
+        if (!chapter._selected || chapter._saved) {
+          continue
         }
-        successChapters++
-        setParsedChapters(prev => prev.map((c, i) =>
-          i === parsedChapters.indexOf(ch) ? { ...c, _saved: true } : c
-        ))
+
+        chapter._saving = true
+        chapter._error = undefined
+
+        try {
+          let targetChapterId = chapter._createdChapterId
+          if (!targetChapterId) {
+            const chapterResponse = await courseService.createChapter(courseId, {
+              title: chapter.title.trim(),
+              orderIndex: chapters.length + importedChapters + 1,
+            }) as any
+            targetChapterId = Number(chapterResponse?.id || chapterResponse?.data?.id)
+            chapter._createdChapterId = targetChapterId
+            hasPartialProgress = true
+          }
+
+          const selectedSections = chapter.sections.filter(section => section._selected)
+          const pendingSections = selectedSections.filter(section => !section._saved)
+
+          for (const section of pendingSections) {
+            section._error = undefined
+            try {
+              await courseService.createSection(courseId, targetChapterId, {
+                title: section.title.trim(),
+                type: section.type,
+                orderIndex: section.orderIndex,
+              })
+              section._saved = true
+              importedSections += 1
+              hasPartialProgress = true
+            } catch (sectionError: any) {
+              section._error =
+                sectionError.response?.data?.message || '课时导入失败，请稍后重试'
+              chapter._error = '章节已创建，但仍有课时未完成导入'
+              stoppedByError = true
+              break
+            }
+          }
+
+          if (stoppedByError) {
+            chapter._saving = false
+            break
+          }
+
+          chapter._saved = true
+          chapter._saving = false
+          chapter._error = undefined
+          importedChapters += 1
+        } catch (chapterError: any) {
+          chapter._saving = false
+          chapter._error =
+            chapterError.response?.data?.message || '章节导入失败，请稍后重试'
+          stoppedByError = true
+          break
+        }
       }
-      message.success(`成功导入 ${successChapters} 个章节`)
+
+      setParsedChapters(nextChapters)
+
+      if (stoppedByError) {
+        message.warning('部分导入成功，失败项已保留，可继续导入未完成项')
+        return
+      }
+
+      message.success(`成功导入 ${importedChapters} 个章节，${importedSections} 个课时`)
       setAiModalVisible(false)
-      setParsedChapters([])
+      resetAiOutlineState()
       await loadChapters()
+      return
     } catch (e: any) {
-      message.error(`导入中断：${e.response?.data?.message || '请检查网络'}`)
+      if (hasPartialProgress) {
+        message.warning('部分导入成功，失败项已保留，可继续导入未完成项')
+      } else {
+        message.error(e.response?.data?.message || '导入失败，请稍后重试')
+      }
+      return
     } finally {
       setAiImporting(false)
     }
+  }
+
+  const updateParsedChapter = (
+    chapterIndex: number,
+    patch: Partial<ParsedOutlineChapterUI>
+  ) => {
+    setParsedChapters(prev =>
+      prev.map((chapter, index) =>
+        index === chapterIndex ? { ...chapter, ...patch } : chapter
+      )
+    )
+  }
+
+  const updateParsedSection = (
+    chapterIndex: number,
+    sectionIndex: number,
+    patch: Partial<ParsedOutlineChapterUI['sections'][number]>
+  ) => {
+    setParsedChapters(prev =>
+      prev.map((chapter, index) => {
+        if (index !== chapterIndex) {
+          return chapter
+        }
+        return {
+          ...chapter,
+          sections: chapter.sections.map((section, currentSectionIndex) =>
+            currentSectionIndex === sectionIndex
+              ? { ...section, ...patch }
+              : section
+          ),
+        }
+      })
+    )
+  }
+
+  const toggleParsedChapterSelected = (chapterIndex: number, checked: boolean) => {
+    updateParsedChapter(chapterIndex, { _selected: checked })
+  }
+
+  const toggleParsedSectionSelected = (
+    chapterIndex: number,
+    sectionIndex: number,
+    checked: boolean
+  ) => {
+    updateParsedSection(chapterIndex, sectionIndex, { _selected: checked })
+  }
+
+  const removeParsedChapter = (chapterIndex: number) => {
+    setParsedChapters(prev => prev.filter((_, index) => index !== chapterIndex))
+  }
+
+  const removeParsedSection = (chapterIndex: number, sectionIndex: number) => {
+    setParsedChapters(prev =>
+      prev.map((chapter, index) => {
+        if (index !== chapterIndex) {
+          return chapter
+        }
+        return {
+          ...chapter,
+          sections: chapter.sections.filter((_, currentSectionIndex) => {
+            return currentSectionIndex !== sectionIndex
+          }),
+        }
+      })
+    )
   }
 
   useEffect(() => {
@@ -202,11 +379,11 @@ const CourseEditPage: React.FC = () => {
     }
   }
 
-  // ── Cover upload ──
+  // 鈹€鈹€ Cover upload 鈹€鈹€
 
   const beforeCoverUpload = (file: File) => {
-    if (!file.type.startsWith('image/')) { message.error('只能上传图片格式的封面!'); return false }
-    if (file.size / 1024 / 1024 > 5) { message.error('封面图片大小不能超过 5MB!'); return false }
+    if (!file.type.startsWith('image/')) { message.error('只能上传图片格式的封面'); return false }
+    if (file.size / 1024 / 1024 > 5) { message.error('封面图片大小不能超过 5MB'); return false }
     return false
   }
 
@@ -225,7 +402,7 @@ const CourseEditPage: React.FC = () => {
     }
   }
 
-  // ── Save course ──
+  // 鈹€鈹€ Save course 鈹€鈹€
 
   const handleSaveCourse = async (values: any) => {
     setSaving(true)
@@ -245,7 +422,7 @@ const CourseEditPage: React.FC = () => {
     }
   }
 
-  // ── Chapter operations ──
+  // 鈹€鈹€ Chapter operations 鈹€鈹€
 
   const openAddChapter = () => {
     setEditingChapter(null)
@@ -275,7 +452,7 @@ const CourseEditPage: React.FC = () => {
       await loadChapters()
     } catch (error: any) {
       if (error.errorFields) return
-      message.error(error.response?.data?.error || '操作失败')
+      message.error(error.response?.data?.error || '鎿嶄綔澶辫触')
     } finally {
       setChapterSaving(false)
     }
@@ -291,7 +468,7 @@ const CourseEditPage: React.FC = () => {
     }
   }
 
-  // ── Section operations ──
+  // 鈹€鈹€ Section operations 鈹€鈹€
 
   const openAddSection = (chapterId: number) => {
     setEditingSection(null)
@@ -341,7 +518,7 @@ const CourseEditPage: React.FC = () => {
       setSections(prev => ({ ...prev, [currentChapterId]: secs }))
     } catch (error: any) {
       if (error.errorFields) return
-      message.error(error.response?.data?.error || '操作失败')
+      message.error(error.response?.data?.error || '鎿嶄綔澶辫触')
     } finally {
       setSectionSaving(false)
     }
@@ -373,6 +550,13 @@ const CourseEditPage: React.FC = () => {
       <Tag icon={<FileTextOutlined />} color="green">图文</Tag>
     )
 
+  const selectedOutlineMeta = countSelectedOutline(parsedChapters)
+  const pendingOutlineImport = hasPendingOutlineImport(parsedChapters)
+  const parseAlertMessage =
+    parseMode === 'rule_fallback'
+      ? getFriendlyOutlineFallbackReason(fallbackReason)
+      : 'AI 解析完成，当前结果可在导入前继续编辑和筛选。'
+
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
@@ -383,7 +567,7 @@ const CourseEditPage: React.FC = () => {
       </div>
 
       <Tabs defaultActiveKey="info">
-        {/* ── Tab 1: 基本信息 ── */}
+        {/* Tab 1: 基本信息 */}
         <Tabs.TabPane tab="基本信息" key="info">
           <Row gutter={[16, 16]}>
             <Col xs={24} md={18}>
@@ -441,7 +625,7 @@ const CourseEditPage: React.FC = () => {
           </Row>
         </Tabs.TabPane>
 
-        {/* ── Tab 2: 课程内容（章节 + 课时） ── */}
+        {/* Tab 2: 课程内容（章节 + 课时） */}
         <Tabs.TabPane tab={`课程内容（${chapters.length} 章节）`} key="chapters">
           <Card
             title="章节与课时管理"
@@ -449,7 +633,7 @@ const CourseEditPage: React.FC = () => {
               <Space>
                 <Button
                   icon={<RobotOutlined />}
-                  onClick={() => { setParsedChapters([]); setAiModalVisible(true) }}
+                  onClick={() => { resetAiOutlineState(); setAiModalVisible(true) }}
                 >
                   AI 导入大纲
                 </Button>
@@ -462,7 +646,7 @@ const CourseEditPage: React.FC = () => {
             {chapters.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <MenuOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
-                <p style={{ color: '#999', marginTop: 12 }}>还没有章节，点击"添加章节"开始</p>
+                <p style={{ color: '#999', marginTop: 12 }}>还没有章节，点击“添加章节”开始</p>
               </div>
             ) : (
               <Collapse
@@ -504,7 +688,7 @@ const CourseEditPage: React.FC = () => {
                       {/* Section list for this chapter */}
                       {chSections.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
-                          暂无课时，点击"添加课时"
+                          暂无课时，点击“添加课时”
                         </div>
                       ) : (
                         <List
@@ -576,7 +760,7 @@ const CourseEditPage: React.FC = () => {
         <Form form={sectionForm} layout="vertical">
           <Form.Item name="title" label="课时标题"
             rules={[{ required: true, message: '请输入课时标题' }, { max: 100 }]}>
-            <Input placeholder="如：1.1 Hello World" />
+            <Input placeholder="濡傦細1.1 Hello World" />
           </Form.Item>
 
           <Form.Item name="type" label="课时类型" rules={[{ required: true }]}>
@@ -619,79 +803,256 @@ const CourseEditPage: React.FC = () => {
       <Modal
         title={<Space><RobotOutlined />AI 智能导入大纲</Space>}
         open={aiModalVisible}
-        onCancel={() => { if (!aiImporting) { setAiModalVisible(false); setParsedChapters([]) } }}
+        onCancel={() => {
+          if (!aiImporting) {
+            setAiModalVisible(false)
+            resetAiOutlineState()
+          }
+        }}
         footer={
           <Space>
-            <Button onClick={() => { setAiModalVisible(false); setParsedChapters([]) }} disabled={aiImporting}>
+            {parsedChapters.length > 0 && (
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={resetAiOutlineState}
+                disabled={aiImporting}
+              >
+                重新上传
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                setAiModalVisible(false)
+                resetAiOutlineState()
+              }}
+              disabled={aiImporting}
+            >
               取消
             </Button>
             <Button
               type="primary"
               onClick={handleAiBatchImport}
               loading={aiImporting}
-              disabled={!parsedChapters.length || aiParsing}
+              disabled={!parsedChapters.length || aiParsing || !pendingOutlineImport}
             >
-              开始导入（{parsedChapters.length} 章节）
+              {pendingOutlineImport && parsedChapters.some(chapter => chapter._createdChapterId || chapter._saved)
+                ? `继续导入未完成项（${selectedOutlineMeta.chapters} 章节）`
+                : `导入已选章节（${selectedOutlineMeta.chapters}）`}
             </Button>
           </Space>
         }
-        width={640}
+        width={860}
         destroyOnHidden
       >
-        <div style={{ marginBottom: 16 }}>
-          <Upload.Dragger
-            accept=".txt,.md"
-            beforeUpload={(file) => { handleAiParse(file); return false }}
-            showUploadList={false}
-            disabled={aiParsing || aiImporting}
-          >
-            <p className="ant-upload-drag-icon">
-              {aiParsing ? <LoadingOutlined style={{ fontSize: 32, color: '#1890ff' }} /> : <RobotOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
-            </p>
-            <p className="ant-upload-text">
-              {aiParsing ? '正在解析大纲文件...' : '点击或拖拽上传大纲文件'}
-            </p>
-            <p className="ant-upload-hint">
-              支持 .txt / .md 格式，文件大小不超过 2MB。<br />
-              章节用「第X章」「1.」「# 标题」标识，课时用缩进或「1.1」「- 」标识。
-            </p>
-          </Upload.Dragger>
-        </div>
+        <RagApiKeyControl />
+
+        {parsedChapters.length === 0 && (
+          <>
+            <Alert
+              message="支持 .txt / .md 格式，文件大小不超过 2MB"
+              description="上传后会优先走模型解析，失败时自动回退到规则解析。识别结果可在导入前继续编辑、取消或删除。"
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+            <Upload.Dragger
+              accept=".txt,.md"
+              beforeUpload={handleAiParse}
+              showUploadList={false}
+              disabled={aiParsing || aiImporting}
+            >
+              <p className="ant-upload-drag-icon">
+                {aiParsing ? (
+                  <LoadingOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+                ) : (
+                  <UploadOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+                )}
+              </p>
+              <p className="ant-upload-text">
+                {aiParsing ? '正在解析大纲文件...' : '点击或拖拽上传大纲文件'}
+              </p>
+              <p className="ant-upload-hint">
+                支持 .txt / .md 格式，按文件后缀和大小校验，不依赖 MIME。
+              </p>
+            </Upload.Dragger>
+          </>
+        )}
 
         {parsedChapters.length > 0 && (
-          <div>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-              识别结果：{parsedChapters.length} 个章节，
-              {parsedChapters.reduce((s, c) => s + c.sections.length, 0)} 个课时
-            </Text>
-            <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6, padding: '8px 0' }}>
-              {parsedChapters.map((ch, ci) => (
-                <div key={ci} style={{ padding: '4px 12px' }}>
-                  <Space>
-                    {ch._saved
-                      ? <Tag color="success">已导入</Tag>
-                      : <Tag color="blue">{ch.orderIndex}</Tag>
-                    }
-                    <Text strong>{ch.title}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {ch.sections.length} 课时
-                    </Text>
+          <Spin spinning={aiImporting} tip="正在导入大纲...">
+            <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              <Alert
+                type={parseMode === 'rule_fallback' ? 'warning' : 'success'}
+                showIcon
+                message={
+                  <Space wrap>
+                    <Tag color={parseMode === 'rule_fallback' ? 'orange' : 'blue'}>
+                      {parseMode === 'rule_fallback' ? '规则解析' : 'AI 解析'}
+                    </Tag>
+                    <Text>{parseAlertMessage}</Text>
                   </Space>
-                  {ch.sections.map((sec, si) => (
-                    <div key={si} style={{ paddingLeft: 32, paddingTop: 2 }}>
-                      <Space size={4}>
-                        {sec.type === 'VIDEO'
-                          ? <Tag icon={<PlayCircleOutlined />} color="blue" style={{ fontSize: 11 }}>视频</Tag>
-                          : <Tag icon={<FileTextOutlined />} color="green" style={{ fontSize: 11 }}>图文</Tag>
-                        }
-                        <Text style={{ fontSize: 13 }}>{sec.title}</Text>
+                }
+              />
+
+              <Text type="secondary">
+                共识别 {parsedChapters.length} 个章节，{parsedChapters.reduce((sum, chapter) => {
+                  return sum + chapter.sections.length
+                }, 0)} 个课时；当前已选 {selectedOutlineMeta.chapters} 个章节、{selectedOutlineMeta.sections} 个课时。
+              </Text>
+
+              <div style={{ maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
+                {parsedChapters.map((chapter, chapterIndex) => (
+                  <Card
+                    key={`${chapter.orderIndex}-${chapterIndex}`}
+                    size="small"
+                    style={{
+                      marginBottom: 12,
+                      borderLeft: `4px solid ${
+                        chapter._error
+                          ? '#ff4d4f'
+                          : chapter._saved
+                            ? '#52c41a'
+                            : chapter._selected
+                              ? '#1890ff'
+                              : '#d9d9d9'
+                      }`,
+                      opacity: chapter._selected ? 1 : 0.72,
+                    }}
+                  >
+                    <Space
+                      align="start"
+                      style={{ width: '100%', justifyContent: 'space-between' }}
+                    >
+                      <Space align="start" style={{ flex: 1 }}>
+                        <Checkbox
+                          checked={chapter._selected}
+                          disabled={aiImporting}
+                          onChange={event => {
+                            toggleParsedChapterSelected(chapterIndex, event.target.checked)
+                          }}
+                        />
+                        <Tag color={chapter._saved ? 'success' : 'blue'}>
+                          {chapter._saved ? '已导入' : `章节 ${chapter.orderIndex}`}
+                        </Tag>
+                        <Input
+                          value={chapter.title}
+                          disabled={aiImporting}
+                          maxLength={100}
+                          placeholder="请输入章节标题"
+                          onChange={event => {
+                            updateParsedChapter(chapterIndex, {
+                              title: event.target.value,
+                              _error: undefined,
+                            })
+                          }}
+                        />
                       </Space>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
+
+                      <Button
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        disabled={aiImporting}
+                        onClick={() => removeParsedChapter(chapterIndex)}
+                      >
+                        删除
+                      </Button>
+                    </Space>
+
+                    {chapter._error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={chapter._error}
+                        style={{ marginTop: 12 }}
+                      />
+                    )}
+
+                    <Space
+                      direction="vertical"
+                      style={{ width: '100%', marginTop: 12 }}
+                      size={8}
+                    >
+                      {chapter.sections.map((section, sectionIndex) => (
+                        <Card key={`${chapterIndex}-${sectionIndex}`} size="small">
+                          <Space
+                            align="start"
+                            style={{ width: '100%', justifyContent: 'space-between' }}
+                          >
+                            <Space align="start" style={{ flex: 1 }}>
+                              <Checkbox
+                                checked={chapter._selected && section._selected}
+                                disabled={aiImporting || !chapter._selected}
+                                onChange={event => {
+                                  toggleParsedSectionSelected(
+                                    chapterIndex,
+                                    sectionIndex,
+                                    event.target.checked
+                                  )
+                                }}
+                              />
+                              <Tag color={section._saved ? 'success' : section.type === 'TEXT' ? 'green' : 'blue'}>
+                                {section._saved
+                                  ? '已导入'
+                                  : section.type === 'TEXT'
+                                    ? '图文'
+                                    : '视频'}
+                              </Tag>
+                              <Input
+                                value={section.title}
+                                disabled={aiImporting || !chapter._selected}
+                                maxLength={100}
+                                placeholder="请输入课时标题"
+                                onChange={event => {
+                                  updateParsedSection(chapterIndex, sectionIndex, {
+                                    title: event.target.value,
+                                    _error: undefined,
+                                  })
+                                }}
+                              />
+                              <Select
+                                value={section.type}
+                                disabled={aiImporting || !chapter._selected}
+                                style={{ width: 110 }}
+                                onChange={value => {
+                                  updateParsedSection(chapterIndex, sectionIndex, {
+                                    type: value as 'VIDEO' | 'TEXT',
+                                  })
+                                }}
+                                options={[
+                                  { label: '视频', value: 'VIDEO' },
+                                  { label: '图文', value: 'TEXT' },
+                                ]}
+                              />
+                            </Space>
+
+                            <Button
+                              size="small"
+                              danger
+                              icon={<DeleteOutlined />}
+                              disabled={aiImporting}
+                              onClick={() => removeParsedSection(chapterIndex, sectionIndex)}
+                            >
+                              删除
+                            </Button>
+                          </Space>
+
+                          {section._error && (
+                            <Alert
+                              type="error"
+                              showIcon
+                              message={section._error}
+                              style={{ marginTop: 12 }}
+                            />
+                          )}
+                        </Card>
+                      ))}
+                    </Space>
+                  </Card>
+                ))}
+              </div>
+            </Space>
+          </Spin>
         )}
       </Modal>
     </div>

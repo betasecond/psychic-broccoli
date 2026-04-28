@@ -1,4 +1,5 @@
 import api from './api'
+import { ragCredentialHeaders } from './ragService'
 
 // 类型定义
 export interface Course {
@@ -96,6 +97,26 @@ export interface CourseMaterial {
   size: number
   courseTitle?: string
   createdAt: string
+}
+
+export interface ParsedOutlineSection {
+  title: string
+  orderIndex: number
+  type: string
+}
+
+export interface ParsedOutlineChapter {
+  title: string
+  orderIndex: number
+  sections: ParsedOutlineSection[]
+}
+
+export interface ParseOutlineResponse {
+  chapters: ParsedOutlineChapter[]
+  chapterCount: number
+  sectionCount: number
+  parseMode: 'llm' | 'rule_fallback'
+  fallbackReason?: string
 }
 
 export interface CoursesResponse {
@@ -222,19 +243,14 @@ export const courseService = {
   },
 
   // AI 解析课程大纲文件
-  async parseOutline(courseId: number, file: File): Promise<{
-    chapters: Array<{
-      title: string
-      orderIndex: number
-      sections: Array<{ title: string; orderIndex: number; type: string }>
-    }>
-    chapterCount: number
-    sectionCount: number
-  }> {
+  async parseOutline(courseId: number, file: File): Promise<ParseOutlineResponse> {
     const formData = new FormData()
     formData.append('file', file)
     return api.post(`/courses/${courseId}/parse-outline`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...ragCredentialHeaders(),
+      },
     }) as any
   },
 

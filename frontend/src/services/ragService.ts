@@ -68,7 +68,7 @@ export const ragCredentialStore = {
   },
 }
 
-const ragCredentialHeaders = () => {
+export const ragCredentialHeaders = () => {
   const { apiKey, provider } = ragCredentialStore.get()
   if (!apiKey) return {}
   return {

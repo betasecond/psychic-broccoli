@@ -24,20 +24,20 @@ const RagApiKeyControl: React.FC = () => {
   const handleSave = () => {
     const value = apiKey.trim()
     if (!value) {
-      message.warning('请输入 API Key')
+      message.warning('请输入模型 API Key')
       return
     }
     ragCredentialStore.set(value, provider)
     setApiKey('')
     setSaved(true)
-    message.success('Key 已保存到当前浏览器会话')
+    message.success('模型 Key 已保存到当前浏览器会话')
   }
 
   const handleClear = () => {
     ragCredentialStore.clear()
     setApiKey('')
     setSaved(false)
-    message.success('已清除当前会话 Key')
+    message.success('已清除当前会话模型 Key')
   }
 
   return (
@@ -63,7 +63,7 @@ const RagApiKeyControl: React.FC = () => {
           size="small"
           value={apiKey}
           autoComplete="off"
-          placeholder={saved ? '已保存，重新输入可覆盖' : '输入个人 API Key'}
+          placeholder={saved ? '已保存，重新输入可覆盖' : '输入个人模型 API Key'}
           onChange={event => setApiKey(event.target.value)}
           style={{ width: 240, maxWidth: '100%' }}
         />
@@ -88,7 +88,7 @@ const RagApiKeyControl: React.FC = () => {
         type="secondary"
         style={{ display: 'block', marginTop: 8, fontSize: 12 }}
       >
-        Key 只保存在当前浏览器会话，随上传或问答请求发送给后端，不写入数据库。
+        Key 只保存在当前浏览器会话，随模型相关请求发送给后端，不写入数据库。
       </Text>
     </div>
   )

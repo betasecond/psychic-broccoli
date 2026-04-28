@@ -26,8 +26,8 @@ type CreateExamRequest struct {
 type AddQuestionRequest struct {
 	Type       string  `json:"type" binding:"required"` // SINGLE_CHOICE, MULTIPLE_CHOICE, TRUE_FALSE, SHORT_ANSWER
 	Stem       string  `json:"stem" binding:"required"`
-	Options    *string `json:"options"`    // JSON字符串
-	Answer     string  `json:"answer"` // JSON字符串（简答题可为空）
+	Options    *string `json:"options"` // JSON字符串
+	Answer     string  `json:"answer"`  // JSON字符串（简答题可为空）
 	Score      float64 `json:"score" binding:"required"`
 	OrderIndex int     `json:"orderIndex"`
 }
@@ -254,6 +254,7 @@ func GetExam(c *gin.Context) {
 		if err != nil {
 			continue
 		}
+		question.Answer = normalizeStoredExamAnswer(question.Answer)
 
 		// 如果是学生查看，不返回答案
 		if role == "STUDENT" {
@@ -467,6 +468,7 @@ func SubmitExam(c *gin.Context) {
 			qSpan.End()
 			continue
 		}
+		question.Answer = normalizeStoredExamAnswer(question.Answer)
 
 		qSpan.SetAttributes(
 			attribute.Int64("question.id", question.ID),
@@ -705,4 +707,3 @@ func GetExamResults(c *gin.Context) {
 
 	utils.Success(c, results)
 }
-
