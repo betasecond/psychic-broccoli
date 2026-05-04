@@ -32,6 +32,7 @@ describe('examService', () => {
         '/exams/7/parse-questions',
         expect.any(FormData),
         {
+          timeout: 60000,
           headers: {
             'Content-Type': 'multipart/form-data',
             'X-RAG-API-Key': 'temp-key',
@@ -57,6 +58,7 @@ describe('examService', () => {
         '/exams/9/parse-questions',
         expect.any(FormData),
         {
+          timeout: 60000,
           headers: {
             'Content-Type': 'multipart/form-data',
           },

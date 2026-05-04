@@ -82,6 +82,7 @@ const ragService = {
     const form = new FormData()
     form.append('file', file)
     return api.post(`/courses/${courseId}/rag/documents`, form, {
+      timeout: 60000,
       headers: {
         'Content-Type': 'multipart/form-data',
         ...ragCredentialHeaders(),
@@ -109,6 +110,7 @@ const ragService = {
         session_id: sessionId,
       },
       {
+        timeout: 60000,
         headers: ragCredentialHeaders(),
       }
     )

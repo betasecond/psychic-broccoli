@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,14 +17,16 @@ import (
 const defaultGenBaseURL = "https://openrouter.ai/api/v1"
 const defaultGenModel = "google/gemini-2.5-flash"
 const defaultGenMaxTokens = 2048
-const defaultGenTimeout = 15 * time.Second
+const defaultGenTimeout = 45 * time.Second
 
 var ErrGenerationTimeout = errors.New("generation timeout")
 
 const systemPrompt = `你是在线教育平台中的课程学习助手。
 请严格只依据提供的课程资料片段回答问题，不要编造资料中没有的信息。
 如果当前资料不足以支持回答，请明确回复：“当前课程资料中未找到足够依据来回答这个问题。”
-回答风格要简洁、清晰，适合教学和复习场景。`
+回答风格要简洁、清晰，适合教学和复习场景。
+不要输出“好的”“根据资料”等寒暄或过程说明，直接给出答案正文。
+当用户要求整理、改写、生成 Markdown、生成大纲或清单时，输出可直接使用的 Markdown 成品：使用清晰标题、列表或表格，不要用代码块包裹，不要只复述原文。`
 
 type ChatMessage struct {
 	Role    string `json:"role"`
@@ -159,5 +163,19 @@ func (c *GenClient) httpClient() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
-	return &http.Client{Timeout: defaultGenTimeout}
+	return &http.Client{Timeout: generationTimeout()}
+}
+
+func generationTimeout() time.Duration {
+	for _, key := range []string{"LLM_TIMEOUT_SECONDS", "RAG_GENERATION_TIMEOUT_SECONDS"} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		seconds, err := strconv.Atoi(raw)
+		if err == nil && seconds > 0 {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	return defaultGenTimeout
 }

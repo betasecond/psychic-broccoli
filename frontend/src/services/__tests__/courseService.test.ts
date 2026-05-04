@@ -32,6 +32,7 @@ describe('courseService.parseOutline', () => {
       '/courses/12/parse-outline',
       expect.any(FormData),
       {
+        timeout: 60000,
         headers: {
           'Content-Type': 'multipart/form-data',
           'X-RAG-API-Key': 'temp-key',
@@ -58,6 +59,7 @@ describe('courseService.parseOutline', () => {
       '/courses/18/parse-outline',
       expect.any(FormData),
       {
+        timeout: 60000,
         headers: {
           'Content-Type': 'multipart/form-data',
         },

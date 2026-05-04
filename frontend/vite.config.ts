@@ -4,9 +4,9 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, __dirname, '')
+  const env = loadEnv(mode, __dirname, 'COURSEARK_')
   const proxyTarget =
-    process.env.VITE_PROXY_TARGET || env.VITE_PROXY_TARGET || 'http://localhost:8080'
+    env.COURSEARK_PROXY_TARGET || 'http://127.0.0.1:8080'
 
   return {
     plugins: [react()],

@@ -224,6 +224,7 @@ export const examService = {
     const formData = new FormData()
     formData.append('file', file)
     return api.post(`/exams/${examId}/parse-questions`, formData, {
+      timeout: 60000,
       headers: {
         'Content-Type': 'multipart/form-data',
         ...ragCredentialHeaders(),

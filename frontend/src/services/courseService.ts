@@ -247,6 +247,7 @@ export const courseService = {
     const formData = new FormData()
     formData.append('file', file)
     return api.post(`/courses/${courseId}/parse-outline`, formData, {
+      timeout: 60000,
       headers: {
         'Content-Type': 'multipart/form-data',
         ...ragCredentialHeaders(),

@@ -48,6 +48,8 @@ coverage/
 *.swp
 *.swo
 *~
+~$*
+**/~$*
 
 # System files
 .DS_Store
@@ -60,6 +62,9 @@ backend/server-linux
 
 # Database files (contain user data, do not commit)
 *.db
+*.db-journal
+*.db.backup-*
+*.db.backup-*-journal
 backend/database/education.db
 backend/education.db
 
@@ -79,5 +84,12 @@ sample-outline.txt
 # Claude local session data
 .claude/
 
+# Codex / local generated scratch files
+.codex-tmp/
+
 # Misc local directories
 openclaw/
+
+# Python local cache
+__pycache__/
+*.pyc

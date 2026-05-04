@@ -34,6 +34,7 @@ import {
   CloudDownloadOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
+import { MarkdownRenderer } from '../../components'
 import RagApiKeyControl from '../../components/RagApiKeyControl'
 import {
   courseService,
@@ -80,6 +81,7 @@ const CourseDetailPage: React.FC = () => {
   const [asking, setAsking] = useState(false)
   const [history, setHistory] = useState<RagQueryHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyVisible, setHistoryVisible] = useState(false)
   const [activeTab, setActiveTab] = useState('chapters')
   const chatBottomRef = useRef<HTMLDivElement>(null)
 
@@ -140,7 +142,7 @@ const CourseDetailPage: React.FC = () => {
   const fetchMaterials = async () => {
     setMaterialsLoading(true)
     try {
-      const data = await courseService.getMaterials(courseId)
+      const data = await courseService.getCourseMaterials(courseId)
       setMaterials(data.materials || [])
     } catch (error) {
       console.error('加载课程资料失败', error)
@@ -159,6 +161,26 @@ const CourseDetailPage: React.FC = () => {
     } finally {
       setHistoryLoading(false)
     }
+  }
+
+  const toggleHistory = async () => {
+    const nextVisible = !historyVisible
+    setHistoryVisible(nextVisible)
+    if (nextVisible && history.length === 0) {
+      await loadHistory()
+    }
+  }
+
+  const appendHistoryQuestion = (item: RagQueryHistory) => {
+    setQaList(prev => [
+      ...prev,
+      {
+        question: item.question,
+        answer: item.answer,
+        sources: item.sources || [],
+      },
+    ])
+    setHistoryVisible(false)
   }
 
   const handleAsk = async () => {
@@ -228,14 +250,45 @@ const CourseDetailPage: React.FC = () => {
     )
 
   const ragTab = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 560 }}>
-      <RagApiKeyControl />
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        height: 620,
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+        }}
+      >
+        <Text strong>知识库问答</Text>
+        <Button
+          size="small"
+          icon={<HistoryOutlined />}
+          onClick={toggleHistory}
+          loading={historyLoading}
+          type={historyVisible ? 'primary' : 'default'}
+        >
+          {historyVisible ? '收起历史' : '历史记录'}
+        </Button>
+      </div>
+      <Collapse size="small" ghost style={{ marginBottom: 8 }}>
+        <Panel header="模型 Key 设置" key="apiKey">
+          <RagApiKeyControl />
+        </Panel>
+      </Collapse>
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
-          padding: '8px 0',
-          marginBottom: 12,
+          padding: '8px 2px 12px',
         }}
       >
         {qaList.length === 0 && (
@@ -295,10 +348,9 @@ const CourseDetailPage: React.FC = () => {
                       padding: '8px 14px',
                       borderRadius: '4px 16px 16px 16px',
                       fontSize: 14,
-                      whiteSpace: 'pre-wrap',
                     }}
                   >
-                    {item.answer}
+                    <MarkdownRenderer content={item.answer} />
                   </div>
                 )}
 
@@ -334,7 +386,7 @@ const CourseDetailPage: React.FC = () => {
       </div>
 
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
-        <Space.Compact style={{ width: '100%' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
           <TextArea
             value={question}
             onChange={e => setQuestion(e.target.value)}
@@ -355,25 +407,47 @@ const CourseDetailPage: React.FC = () => {
             onClick={handleAsk}
             loading={asking}
             disabled={!question.trim()}
-            style={{ height: 'auto', alignSelf: 'flex-end' }}
+            style={{ width: 92, height: 'auto' }}
           >
             发送
           </Button>
-        </Space.Compact>
+        </div>
 
-        <div style={{ marginTop: 8 }}>
+        <div
+          style={{
+            display: historyVisible ? 'block' : 'none',
+            position: 'absolute',
+            top: 42,
+            right: 0,
+            bottom: 0,
+            width: 300,
+            zIndex: 5,
+            background: '#fff',
+            borderLeft: '1px solid #f0f0f0',
+            boxShadow: '-8px 0 18px rgba(15, 23, 42, 0.08)',
+            padding: 12,
+            overflowY: 'auto',
+          }}
+        >
           <Button
             size="small"
             type="link"
             icon={<HistoryOutlined />}
-            onClick={loadHistory}
+            onClick={toggleHistory}
             loading={historyLoading}
-            style={{ padding: 0 }}
+            style={{ padding: 0, marginBottom: 8 }}
           >
-            查看历史记录
+            {historyVisible ? '收起历史记录' : '查看历史记录'}
           </Button>
-          {history.length > 0 && (
-            <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' }}>
+          {historyVisible && history.length === 0 && !historyLoading && (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无历史记录"
+              style={{ marginTop: 80 }}
+            />
+          )}
+          {historyVisible && history.length > 0 && (
+            <div>
               <List
                 size="small"
                 dataSource={history}
@@ -381,16 +455,7 @@ const CourseDetailPage: React.FC = () => {
                   <List.Item
                     key={item.id}
                     style={{ cursor: 'pointer', padding: '4px 8px' }}
-                    onClick={() =>
-                      setQaList(prev => [
-                        ...prev,
-                        {
-                          question: item.question,
-                          answer: item.answer,
-                          sources: item.sources || [],
-                        },
-                      ])
-                    }
+                    onClick={() => appendHistoryQuestion(item)}
                   >
                     <List.Item.Meta
                       title={
@@ -752,7 +817,7 @@ const CourseDetailPage: React.FC = () => {
                   <Progress
                     type="circle"
                     percent={progress}
-                    width={80}
+                    size={80}
                     status={progress === 100 ? 'success' : 'active'}
                   />
                 </div>
