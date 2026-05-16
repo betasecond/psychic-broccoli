@@ -3,6 +3,7 @@ import { Card, Row, Col, Button, Typography, Space, Tag, Spin, message, Input } 
 import { BookOutlined, SearchOutlined, UserOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { courseService } from '../../services/courseService';
+import { resolveFileUrl } from '../../utils/fileUrl';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -89,15 +90,17 @@ const CourseBrowsePage: React.FC = () => {
         </Card>
       ) : (
         <Row gutter={[16, 16]}>
-          {courses.map((course) => (
+          {courses.map((course) => {
+            const coverSrc = resolveFileUrl(course.coverImageUrl)
+            return (
             <Col xs={24} sm={12} md={8} lg={6} key={course.id}>
               <Card
                 hoverable
                 cover={
-                  course.coverImageUrl ? (
+                  coverSrc ? (
                     <img
                       alt={course.title}
-                      src={course.coverImageUrl}
+                      src={coverSrc}
                       style={{ height: '180px', objectFit: 'cover' }}
                     />
                   ) : (
@@ -160,7 +163,7 @@ const CourseBrowsePage: React.FC = () => {
                 />
               </Card>
             </Col>
-          ))}
+          )})}
         </Row>
       )}
     </div>

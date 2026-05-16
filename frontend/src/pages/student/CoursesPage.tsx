@@ -4,6 +4,7 @@ import { BookOutlined, StarOutlined, CalendarOutlined, PlayCircleOutlined, Searc
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector, selectMyCourses, selectCourseLoading, selectCourseError } from '../../store';
 import { fetchMyCourses } from '../../store/slices/courseSlice';
+import { resolveFileUrl } from '../../utils/fileUrl';
 
 const { Title, Text } = Typography;
 
@@ -26,20 +27,61 @@ const CoursesPage: React.FC = () => {
 
   const columns = [
     {
+      title: '封面',
+      dataIndex: 'coverImageUrl',
+      key: 'coverImageUrl',
+      width: 112,
+      align: 'center' as const,
+      render: (coverImageUrl: string, record: any) => {
+        const coverSrc = resolveFileUrl(coverImageUrl);
+        return coverSrc ? (
+          <img
+            src={coverSrc}
+            alt={record.title}
+            style={{ width: 72, height: 44, objectFit: 'cover', borderRadius: 4 }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 72,
+              height: 44,
+              borderRadius: 4,
+              backgroundColor: '#f0f0f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BookOutlined style={{ color: '#bfbfbf' }} />
+          </div>
+        )
+      },
+    },
+    {
       title: '课程名称',
       dataIndex: 'title',
       key: 'title',
-      render: (text: string) => <Text strong>{text}</Text>,
+      width: 180,
+      render: (text: string) => (
+        <Text strong style={{ display: 'block', minWidth: 120 }}>
+          {text}
+        </Text>
+      ),
     },
     {
       title: '授课教师',
       dataIndex: 'instructorName',
       key: 'instructorName',
+      width: 140,
+      render: (name: string) => (
+        <Text style={{ display: 'block', minWidth: 100 }}>{name || '-'}</Text>
+      ),
     },
     {
       title: '类别',
       dataIndex: 'categoryName',
       key: 'categoryName',
+      width: 130,
       render: (category: string) => (
         category ? <Tag color="blue">{category}</Tag> : <Text type="secondary">-</Text>
       ),
@@ -47,14 +89,15 @@ const CoursesPage: React.FC = () => {
     {
       title: '进度',
       key: 'progress',
+      width: 100,
       render: (record: any) => (
-        <div>
+        <div style={{ width: 72 }}>
           <div>{record.progress || 0}%</div>
           <div style={{ width: '100%', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-            <div 
-              style={{ 
-                width: `${record.progress || 0}%`, 
-                height: '8px', 
+            <div
+              style={{
+                width: `${record.progress || 0}%`,
+                height: '8px',
                 backgroundColor: (record.progress || 0) === 100 ? '#52c41a' : '#1890ff',
                 borderRadius: '4px'
               }}
@@ -66,6 +109,7 @@ const CoursesPage: React.FC = () => {
     {
       title: '状态',
       key: 'status',
+      width: 100,
       render: (record: any) => {
         const progress = record.progress || 0;
         return (
@@ -78,12 +122,13 @@ const CoursesPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
+      width: 150,
       render: (record: any) => (
-        <Space size="middle">
-          <Button type="link" onClick={() => navigate(`/student/courses/${record.id}`)}>
+        <Space size={4} style={{ whiteSpace: 'nowrap' }}>
+          <Button type="link" size="small" onClick={() => navigate(`/student/courses/${record.id}`)}>
             查看
           </Button>
-          <Button type="link" onClick={() => navigate(`/student/courses/${record.id}`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/student/courses/${record.id}`)}>
             继续学习
           </Button>
         </Space>
@@ -120,11 +165,13 @@ const CoursesPage: React.FC = () => {
               </Space>
             </div>
             
-            <Table 
-              dataSource={courses} 
-              columns={columns} 
+            <Table
+              dataSource={courses}
+              columns={columns}
               rowKey="id"
               loading={loading}
+              tableLayout="fixed"
+              scroll={{ x: 860 }}
               pagination={{
                 pageSize: 5,
                 showSizeChanger: true,
@@ -143,21 +190,30 @@ const CoursesPage: React.FC = () => {
             const iconColors = ['#1890ff', '#fa8c16', '#52c41a'];
             const icons = [BookOutlined, PlayCircleOutlined, CalendarOutlined];
             const Icon = icons[index % 3];
+            const coverSrc = resolveFileUrl(course.coverImageUrl);
             
             return (
               <Col xs={24} sm={12} md={8} key={course.id}>
                 <Card 
                   hoverable
                   cover={
-                    <div style={{ 
-                      height: '120px', 
-                      backgroundColor: colors[index % 3], 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center' 
-                    }}>
-                      <Icon style={{ fontSize: '48px', color: iconColors[index % 3] }} />
-                    </div>
+                    coverSrc ? (
+                      <img
+                        alt={course.title}
+                        src={coverSrc}
+                        style={{ height: '120px', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{
+                        height: '120px',
+                        backgroundColor: colors[index % 3],
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Icon style={{ fontSize: '48px', color: iconColors[index % 3] }} />
+                      </div>
+                    )
                   }
                   onClick={() => navigate(`/student/courses/${course.id}`)}
                 >

@@ -39,9 +39,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import RagApiKeyControl from '@/components/RagApiKeyControl'
 import { courseService, type CourseSection } from '@/services/courseService'
 import ragService, { type RagDocument } from '@/services/ragService'
+import { resolveFileUrl } from '@/utils/fileUrl'
 
 const { Title, Text, Paragraph } = Typography
-const { Panel } = Collapse
 
 const TeacherCourseViewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -134,7 +134,7 @@ const TeacherCourseViewPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ padding: '80px 24px 24px', textAlign: 'center' }}>
         <Spin size="large" tip="加载中..." />
       </div>
     )
@@ -161,6 +161,81 @@ const TeacherCourseViewPage: React.FC = () => {
     (s, ch) => s + (sections[ch.id]?.length || 0),
     0
   )
+  const coverSrc = resolveFileUrl(course.coverImageUrl)
+  const chapterCollapseItems = chapters.map((chapter: any) => {
+    const chSections = sections[chapter.id] || []
+    return {
+      key: chapter.id,
+      label: (
+        <Space>
+          <Tag color="blue">{chapter.orderIndex}</Tag>
+          <Text strong>{chapter.title}</Text>
+          <Badge
+            count={chSections.length}
+            showZero
+            color="#8c8c8c"
+            style={{ fontSize: 11 }}
+          />
+        </Space>
+      ),
+      children:
+        chSections.length === 0 ? (
+          <Text type="secondary" style={{ paddingLeft: 8 }}>
+            本章节暂无课时
+          </Text>
+        ) : (
+          <List
+            size="small"
+            dataSource={chSections}
+            renderItem={sec => (
+              <List.Item key={sec.id} style={{ padding: '8px 12px' }}>
+                <List.Item.Meta
+                  avatar={
+                    sec.type === 'VIDEO' ? (
+                      <Tag
+                        icon={<PlayCircleOutlined />}
+                        color="blue"
+                        style={{ marginRight: 0 }}
+                      >
+                        视频
+                      </Tag>
+                    ) : (
+                      <Tag
+                        icon={<FileTextOutlined />}
+                        color="green"
+                        style={{ marginRight: 0 }}
+                      >
+                        图文
+                      </Tag>
+                    )
+                  }
+                  title={
+                    <Text style={{ fontSize: 14 }}>
+                      {sec.orderIndex}. {sec.title}
+                    </Text>
+                  }
+                  description={
+                    sec.videoUrl ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {sec.videoUrl.length > 60
+                          ? sec.videoUrl.slice(0, 60) + '...'
+                          : sec.videoUrl}
+                      </Text>
+                    ) : sec.content ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {sec.content.length > 80
+                          ? sec.content.slice(0, 80) + '...'
+                          : sec.content}
+                      </Text>
+                    ) : null
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        ),
+    }
+  })
 
   return (
     <div style={{ padding: 24 }}>
@@ -200,9 +275,9 @@ const TeacherCourseViewPage: React.FC = () => {
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <div>
                 <Space align="start" style={{ flexWrap: 'wrap' }}>
-                  {course.coverImageUrl && (
+                  {coverSrc && (
                     <img
-                      src={course.coverImageUrl}
+                      src={coverSrc}
                       alt="课程封面"
                       style={{
                         width: 120,
@@ -287,93 +362,8 @@ const TeacherCourseViewPage: React.FC = () => {
                 expandIcon={({ isActive }) => (
                   <DownOutlined rotate={isActive ? 180 : 0} />
                 )}
-              >
-                {chapters.map((chapter: any) => {
-                  const chSections = sections[chapter.id] || []
-                  return (
-                    <Panel
-                      key={chapter.id}
-                      header={
-                        <Space>
-                          <Tag color="blue">{chapter.orderIndex}</Tag>
-                          <Text strong>{chapter.title}</Text>
-                          <Badge
-                            count={chSections.length}
-                            showZero
-                            color="#8c8c8c"
-                            style={{ fontSize: 11 }}
-                          />
-                        </Space>
-                      }
-                    >
-                      {chSections.length === 0 ? (
-                        <Text type="secondary" style={{ paddingLeft: 8 }}>
-                          本章节暂无课时
-                        </Text>
-                      ) : (
-                        <List
-                          size="small"
-                          dataSource={chSections}
-                          renderItem={sec => (
-                            <List.Item
-                              key={sec.id}
-                              style={{ padding: '8px 12px' }}
-                            >
-                              <List.Item.Meta
-                                avatar={
-                                  sec.type === 'VIDEO' ? (
-                                    <Tag
-                                      icon={<PlayCircleOutlined />}
-                                      color="blue"
-                                      style={{ marginRight: 0 }}
-                                    >
-                                      视频
-                                    </Tag>
-                                  ) : (
-                                    <Tag
-                                      icon={<FileTextOutlined />}
-                                      color="green"
-                                      style={{ marginRight: 0 }}
-                                    >
-                                      图文
-                                    </Tag>
-                                  )
-                                }
-                                title={
-                                  <Text style={{ fontSize: 14 }}>
-                                    {sec.orderIndex}. {sec.title}
-                                  </Text>
-                                }
-                                description={
-                                  sec.videoUrl ? (
-                                    <Text
-                                      type="secondary"
-                                      style={{ fontSize: 12 }}
-                                    >
-                                      {sec.videoUrl.length > 60
-                                        ? sec.videoUrl.slice(0, 60) + '...'
-                                        : sec.videoUrl}
-                                    </Text>
-                                  ) : sec.content ? (
-                                    <Text
-                                      type="secondary"
-                                      style={{ fontSize: 12 }}
-                                    >
-                                      {sec.content.length > 80
-                                        ? sec.content.slice(0, 80) + '...'
-                                        : sec.content}
-                                    </Text>
-                                  ) : null
-                                }
-                              />
-                            </List.Item>
-                          )}
-                        />
-                      )}
-                    </Panel>
-                  )
-                })}
-              </Collapse>
+                items={chapterCollapseItems}
+              />
             )}
           </Card>
 

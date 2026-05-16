@@ -23,9 +23,9 @@ import {
   PlusOutlined,
   LoadingOutlined,
 } from '@ant-design/icons'
-import type { UploadChangeParam, UploadFile } from 'antd/es/upload'
 import { courseService, type Category } from '@/services/courseService'
 import { uploadFile } from '@/services/fileService'
+import { resolveFileUrl } from '@/utils/fileUrl'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -56,23 +56,17 @@ const CreateCoursePage: React.FC = () => {
     }
   }
 
-  const beforeCoverUpload = (file: File) => {
+  const beforeCoverUpload = async (file: File) => {
     const isImage = file.type.startsWith('image/')
     if (!isImage) {
       message.error('只能上传图片格式的封面!')
-      return false
+      return Upload.LIST_IGNORE
     }
     const isLt5M = file.size / 1024 / 1024 < 5
     if (!isLt5M) {
       message.error('封面图片大小不能超过 5MB!')
-      return false
+      return Upload.LIST_IGNORE
     }
-    return false // Prevent auto upload; handle manually
-  }
-
-  const handleCoverChange = async (info: UploadChangeParam<UploadFile>) => {
-    const file = info.file.originFileObj
-    if (!file) return
 
     setCoverUploading(true)
     try {
@@ -84,9 +78,14 @@ const CreateCoursePage: React.FC = () => {
     } finally {
       setCoverUploading(false)
     }
+    return Upload.LIST_IGNORE
   }
 
   const onFinish = async (values: any) => {
+    if (coverUploading) {
+      message.warning('封面还在上传中，请稍等')
+      return
+    }
     setLoading(true)
     try {
       const createData = {
@@ -193,11 +192,11 @@ const CreateCoursePage: React.FC = () => {
                     listType="picture-card"
                     showUploadList={false}
                     beforeUpload={beforeCoverUpload}
-                    onChange={handleCoverChange}
+                    accept="image/*"
                   >
                     {coverUrl ? (
                       <img
-                        src={coverUrl}
+                        src={resolveFileUrl(coverUrl)}
                         alt="课程封面"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
@@ -221,7 +220,7 @@ const CreateCoursePage: React.FC = () => {
                       type="primary"
                       htmlType="submit"
                       loading={loading}
-                      disabled={categoriesLoading}
+                      disabled={categoriesLoading || coverUploading}
                     >
                       创建课程
                     </Button>

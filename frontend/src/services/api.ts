@@ -25,6 +25,18 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    if (
+      typeof FormData !== 'undefined' &&
+      config.data instanceof FormData &&
+      config.headers
+    ) {
+      const headers = config.headers as any
+      headers.delete?.('Content-Type')
+      headers.delete?.('content-type')
+      delete headers['Content-Type']
+      delete headers['content-type']
+    }
     
     // 添加请求ID用于调试
     if (config.headers) {

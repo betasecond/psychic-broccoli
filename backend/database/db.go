@@ -70,6 +70,19 @@ func autoMigrate() error {
 	if err := rebuildCourseSectionsTableIfNeeded(); err != nil {
 		return err
 	}
+	if _, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS chapter_completions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			chapter_id INTEGER NOT NULL REFERENCES course_chapters(id) ON DELETE CASCADE,
+			completed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(student_id, chapter_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("创建 chapter_completions 表失败: %v", err)
+	}
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_chapter_completions_student_id ON chapter_completions(student_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_chapter_completions_chapter_id ON chapter_completions(chapter_id)`)
 
 	// 2. users 琛?- 蹇呴』鍔犱笂杩欓儴鍒嗘潵淇 full_name 缂哄け闂
 	if err := addColumnIfNotExists("users", "full_name", "TEXT"); err != nil {

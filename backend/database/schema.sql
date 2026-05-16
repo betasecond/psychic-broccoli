@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS course_chapters (
     order_index INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS chapter_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chapter_id INTEGER NOT NULL REFERENCES course_chapters(id) ON DELETE CASCADE,
+    completed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(student_id, chapter_id)
+);
+
 -- 璇炬椂琛?
 CREATE TABLE IF NOT EXISTS course_sections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

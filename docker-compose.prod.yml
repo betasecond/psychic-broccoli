@@ -39,8 +39,8 @@ services:
     volumes:
       # Persist SQLite database
       - sqlite_data:/data
-      # Persist uploaded files (attachments, etc.)
-      - uploads_data:/app/public/uploads
+      # Persist uploaded files (covers, avatars, assignments, materials, etc.)
+      - uploads_data:/app/public
     networks:
       - courseark-network
     labels:
@@ -146,7 +146,7 @@ volumes:
   # Named volume for SQLite database persistence
   sqlite_data:
     driver: local
-  # Named volume for user-uploaded files (attachments, etc.)
+  # Named volume for user-uploaded files (covers, avatars, assignments, materials, etc.)
   uploads_data:
     driver: local
   # Caddy data for certificates

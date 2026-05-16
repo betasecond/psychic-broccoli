@@ -20,7 +20,7 @@ func GetMyCourses(c *gin.Context) {
 	}
 
 	rows, err := database.DB.Query(`
-		SELECT c.id, c.title, c.description, c.instructor_id, c.category_id, c.created_at,
+		SELECT c.id, c.title, c.description, c.cover_image_url, c.instructor_id, c.category_id, c.created_at,
 		       u.username as instructor_name,
 		       cat.name as category_name,
 		       ce.enrolled_at,
@@ -44,14 +44,18 @@ func GetMyCourses(c *gin.Context) {
 		var id, instructorID int64
 		var title string
 		var description sql.NullString
+		var coverImageURL sql.NullString
 		var categoryID sql.NullInt64
 		var createdAt, enrolledAt sql.NullTime
 		var instructorName string
 		var categoryName sql.NullString
 		var progress int
 
-		rows.Scan(&id, &title, &description, &instructorID, &categoryID, &createdAt,
-			&instructorName, &categoryName, &enrolledAt, &progress)
+		if err := rows.Scan(&id, &title, &description, &coverImageURL, &instructorID, &categoryID, &createdAt,
+			&instructorName, &categoryName, &enrolledAt, &progress); err != nil {
+			utils.InternalServerError(c, "解析课程数据失败")
+			return
+		}
 
 		course := gin.H{
 			"id":             id,
@@ -62,6 +66,9 @@ func GetMyCourses(c *gin.Context) {
 
 		if description.Valid {
 			course["description"] = description.String
+		}
+		if coverImageURL.Valid {
+			course["coverImageUrl"] = coverImageURL.String
 		}
 		if categoryID.Valid {
 			course["categoryId"] = categoryID.Int64
@@ -333,9 +340,9 @@ func CompleteChapter(c *gin.Context) {
 		return
 	}
 
-	// 插入或更新完成记录（使用 REPLACE 处理重复）
+	// 插入完成记录，重复点击时保持幂等。
 	_, err = database.DB.Exec(`
-		INSERT OR REPLACE INTO chapter_completions (student_id, chapter_id, completed_at)
+		INSERT OR IGNORE INTO chapter_completions (student_id, chapter_id, completed_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP)
 	`, userID, chapterID)
 
@@ -347,16 +354,22 @@ func CompleteChapter(c *gin.Context) {
 	// 自动更新课程进度
 	// 计算已完成章节数和总章节数
 	var completedCount, totalCount int
-	database.DB.QueryRow(`
+	if err := database.DB.QueryRow(`
 		SELECT COUNT(*) FROM chapter_completions
 		WHERE student_id = ? AND chapter_id IN (
 			SELECT id FROM course_chapters WHERE course_id = ?
 		)
-	`, userID, courseID).Scan(&completedCount)
+	`, userID, courseID).Scan(&completedCount); err != nil {
+		utils.InternalServerError(c, "统计完成章节失败")
+		return
+	}
 
-	database.DB.QueryRow(`
+	if err := database.DB.QueryRow(`
 		SELECT COUNT(*) FROM course_chapters WHERE course_id = ?
-	`, courseID).Scan(&totalCount)
+	`, courseID).Scan(&totalCount); err != nil {
+		utils.InternalServerError(c, "统计课程章节失败")
+		return
+	}
 
 	// 计算进度百分比
 	progress := 0
@@ -365,11 +378,14 @@ func CompleteChapter(c *gin.Context) {
 	}
 
 	// 更新课程进度
-	database.DB.Exec(`
+	if _, err := database.DB.Exec(`
 		UPDATE course_enrollments
 		SET progress = ?
 		WHERE student_id = ? AND course_id = ?
-	`, progress, userID, courseID)
+	`, progress, userID, courseID); err != nil {
+		utils.InternalServerError(c, "更新课程进度失败")
+		return
+	}
 
 	utils.Success(c, gin.H{
 		"message":        "章节已标记为完成",

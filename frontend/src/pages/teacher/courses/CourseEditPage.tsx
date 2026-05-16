@@ -38,7 +38,6 @@ import {
   ReloadOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
-import type { UploadChangeParam, UploadFile } from 'antd/es/upload'
 import {
   courseService,
   type Category,
@@ -47,6 +46,7 @@ import {
 } from '@/services/courseService'
 import RagApiKeyControl from '@/components/RagApiKeyControl'
 import { uploadFile } from '@/services/fileService'
+import { resolveFileUrl } from '@/utils/fileUrl'
 import {
   countSelectedOutline,
   getFriendlyOutlineFallbackReason,
@@ -381,15 +381,15 @@ const CourseEditPage: React.FC = () => {
 
   // 鈹€鈹€ Cover upload 鈹€鈹€
 
-  const beforeCoverUpload = (file: File) => {
-    if (!file.type.startsWith('image/')) { message.error('只能上传图片格式的封面'); return false }
-    if (file.size / 1024 / 1024 > 5) { message.error('封面图片大小不能超过 5MB'); return false }
-    return false
-  }
-
-  const handleCoverChange = async (info: UploadChangeParam<UploadFile>) => {
-    const file = info.file.originFileObj
-    if (!file) return
+  const beforeCoverUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      message.error('只能上传图片格式的封面')
+      return Upload.LIST_IGNORE
+    }
+    if (file.size / 1024 / 1024 > 5) {
+      message.error('封面图片大小不能超过 5MB')
+      return Upload.LIST_IGNORE
+    }
     setCoverUploading(true)
     try {
       const result = await uploadFile(file, 'cover')
@@ -400,11 +400,16 @@ const CourseEditPage: React.FC = () => {
     } finally {
       setCoverUploading(false)
     }
+    return Upload.LIST_IGNORE
   }
 
   // 鈹€鈹€ Save course 鈹€鈹€
 
   const handleSaveCourse = async (values: any) => {
+    if (coverUploading) {
+      message.warning('封面还在上传中，请稍等')
+      return
+    }
     setSaving(true)
     try {
       await courseService.updateCourse(courseId, {
@@ -600,10 +605,15 @@ const CourseEditPage: React.FC = () => {
                   </Form.Item>
 
                   <Form.Item label="课程封面">
-                    <Upload name="cover" listType="picture-card" showUploadList={false}
-                      beforeUpload={beforeCoverUpload} onChange={handleCoverChange}>
+                    <Upload
+                      name="cover"
+                      listType="picture-card"
+                      showUploadList={false}
+                      beforeUpload={beforeCoverUpload}
+                      accept="image/*"
+                    >
                       {coverUrl ? (
-                        <img src={coverUrl} alt="课程封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={resolveFileUrl(coverUrl)} alt="课程封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <div>
                           {coverUploading ? <LoadingOutlined /> : <PlusOutlined />}
@@ -615,7 +625,13 @@ const CourseEditPage: React.FC = () => {
                   </Form.Item>
 
                   <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={saving} icon={<SaveOutlined />}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={saving}
+                      disabled={coverUploading}
+                      icon={<SaveOutlined />}
+                    >
                       保存修改
                     </Button>
                   </Form.Item>

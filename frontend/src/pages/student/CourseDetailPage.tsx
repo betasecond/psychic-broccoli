@@ -46,6 +46,7 @@ import ragService, {
   type RagQueryHistory,
   type RagSource,
 } from '../../services/ragService'
+import { resolveFileUrl } from '../../utils/fileUrl'
 
 const { Title, Text, Paragraph } = Typography
 const { Panel } = Collapse
@@ -503,6 +504,8 @@ const CourseDetailPage: React.FC = () => {
     )
   }
 
+  const coverSrc = resolveFileUrl(course.coverImageUrl)
+
   return (
     <div style={{ padding: 24 }}>
       <Space style={{ marginBottom: 24 }}>
@@ -519,16 +522,32 @@ const CourseDetailPage: React.FC = () => {
           <Card>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <div>
-                <Space>
-                  <BookOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                  <Title level={2} style={{ margin: 0 }}>
-                    {course.title}
-                  </Title>
+                <Space align="start" size="middle">
+                  {coverSrc ? (
+                    <img
+                      src={coverSrc}
+                      alt="课程封面"
+                      style={{
+                        width: 160,
+                        height: 96,
+                        objectFit: 'cover',
+                        borderRadius: 6,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <BookOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                  )}
+                  <div>
+                    <Title level={2} style={{ margin: 0 }}>
+                      {course.title}
+                    </Title>
+                    <div style={{ marginTop: 12 }}>
+                      <Text type="secondary">授课教师：</Text>
+                      <Text strong>{course.instructorName}</Text>
+                    </div>
+                  </div>
                 </Space>
-                <div style={{ marginTop: 12 }}>
-                  <Text type="secondary">授课教师：</Text>
-                  <Text strong>{course.instructorName}</Text>
-                </div>
               </div>
 
               <div>
