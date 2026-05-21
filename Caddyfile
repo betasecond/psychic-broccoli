@@ -1,3 +1,15 @@
 web.courseark.online {
     reverse_proxy web:80
 }
+
+dubbing.courseark.online {
+    # API routes - proxy to backend (higher priority)
+    handle /api/* {
+        reverse_proxy dubbing-api:8000
+    }
+
+    # Everything else goes to frontend
+    handle {
+        reverse_proxy dubbing-frontend:3000
+    }
+}

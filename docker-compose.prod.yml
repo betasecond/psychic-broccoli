@@ -47,7 +47,7 @@ services:
       # Enable watchtower auto-update for this service
       - "com.centurylinklabs.watchtower.enable=true"
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O - http://localhost:8080/health > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O - http://127.0.0.1:8080/health > /dev/null || exit 1"]
       interval: 30s
       timeout: 3s
       start_period: 10s

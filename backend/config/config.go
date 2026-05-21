@@ -57,9 +57,7 @@ func getEnvBool(key string, defaultValue bool) bool {
 	value := os.Getenv(key)
 	if value == "" {
 		return defaultValue
-	}
-
-	// 支持多种布尔值表示
+	}	// 支持多种布尔值表示
 	switch value {
 	case "true", "TRUE", "True", "1", "yes", "YES", "Yes", "on", "ON", "On":
 		return true
